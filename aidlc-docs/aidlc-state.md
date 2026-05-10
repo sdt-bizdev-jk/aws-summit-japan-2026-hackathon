@@ -4,7 +4,7 @@
 - **Project Type**: Greenfield
 - **Project Name**: たびたび
 - **Start Date**: 2026-05-09T00:00:00Z
-- **Current Stage**: INCEPTION - Application Design (In Progress)
+- **Current Stage**: CONSTRUCTION - Functional Design (Pending)
 
 ## Workspace State
 - **Existing Code**: No
@@ -32,8 +32,8 @@
 - [x] INCEPTION - Requirements Analysis
 - [x] INCEPTION - User Stories
 - [x] INCEPTION - Workflow Planning
-- [ ] INCEPTION - Application Design - EXECUTE
-- [ ] INCEPTION - Units Generation - EXECUTE
+- [x] INCEPTION - Application Design - EXECUTE
+- [x] INCEPTION - Units Generation - EXECUTE
 - [ ] CONSTRUCTION - Functional Design - EXECUTE
 - [ ] CONSTRUCTION - NFR Requirements - SKIP
 - [ ] CONSTRUCTION - NFR Design - SKIP
