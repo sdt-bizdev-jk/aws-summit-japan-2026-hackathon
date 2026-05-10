@@ -2,6 +2,8 @@
 
 > やめることが、旅になる。
 
+![たびたび概要](assets/overview.png)
+
 三日坊主を繰り返すほど、AIが「次に始めたら面白そうなこと」を提案してくれる。  
 挫折を肯定し、ダメであるほどサービスが賢くなる構造を持つPWAアプリケーション。
 
@@ -63,28 +65,38 @@
 
 ## アーキテクチャ
 
-```
-┌───────────────────────────────────────────────┐
-│           Frontend (Next.js 16 / PWA)          │
-└────────────────────┬──────────────────────────┘
-                     │ REST API
-                     ▼
-┌───────────────────────────────────────────────┐
-│              ALB (Load Balancer)                │
-└────────────────────┬──────────────────────────┘
-                     ▼
-┌───────────────────────────────────────────────┐
-│         Django + DRF (ECS Fargate)             │
-│                                               │
-│  trips │ analysis │ notifications │ social    │
-│                                               │
-│              utils/AIService                   │
-└──────┬────────────────────────┬───────────────┘
-       ▼                        ▼
-┌──────────────┐     ┌─────────────────────┐
-│ RDS          │     │ Amazon Bedrock      │
-│ PostgreSQL   │     │ (Claude)            │
-└──────────────┘     └─────────────────────┘
+```mermaid
+graph TD
+    subgraph Client
+        FE[Next.js 16 / PWA]
+    end
+
+    subgraph AWS
+        ALB[ALB]
+        subgraph ECS Fargate
+            DJ[Django + DRF]
+            TRIPS[trips]
+            ANALYSIS[analysis]
+            NOTIF[notifications]
+            SOCIAL[social]
+            UTILS[utils / AIService]
+        end
+        RDS[(RDS PostgreSQL)]
+        BEDROCK[Amazon Bedrock\nClaude]
+    end
+
+    FE -->|REST API| ALB
+    ALB --> DJ
+    DJ --- TRIPS
+    DJ --- ANALYSIS
+    DJ --- NOTIF
+    DJ --- SOCIAL
+    DJ --- UTILS
+    TRIPS --> RDS
+    ANALYSIS --> RDS
+    NOTIF --> RDS
+    SOCIAL --> RDS
+    UTILS --> BEDROCK
 ```
 
 ### 技術スタック
@@ -133,7 +145,7 @@ Unit 2/3 は Unit 1 に依存。互いには独立。
 ## プロジェクト構成
 
 ```
-tabitabi/
+aws-summit-japan-2026-hackathon/
 ├── backend/                # Django プロジェクト
 │   ├── config/             # settings, urls, wsgi
 │   ├── trips/              # 旅のライフサイクル

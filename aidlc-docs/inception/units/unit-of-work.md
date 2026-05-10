@@ -104,14 +104,14 @@
 ## コード構成戦略
 
 ```
-tabitabi/                          # プロジェクトルート
+aws-summit-japan-2026-hackathon/   # ワークスペースルート
 ├── backend/                       # Django プロジェクト
 │   ├── config/                    # Django設定 (settings, urls, wsgi)
 │   ├── trips/                     # Unit 1
 │   ├── analysis/                  # Unit 2
 │   ├── notifications/             # Unit 3
 │   ├── social/                    # Unit 3
-│   ├── utils/                     # 共通 (Unit 1で作成)
+│   ├── utils/                     # 共通モジュール (Unit 1で作成)
 │   └── manage.py
 ├── frontend/                      # Next.js プロジェクト
 │   ├── app/                       # App Router
@@ -125,6 +125,7 @@ tabitabi/                          # プロジェクトルート
 │   ├── lib/                       # API クライアント等
 │   └── public/
 ├── infra/                         # IaC (CDK or Terraform)
+├── aidlc-docs/                    # 設計ドキュメント
 └── docker-compose.yml             # ローカル開発環境
 ```
 
