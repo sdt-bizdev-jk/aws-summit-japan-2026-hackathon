@@ -182,3 +182,8 @@ Inception フェーズの成果物は [`aidlc-docs/`](./aidlc-docs/) に格納:
 - [ユーザーストーリー](./aidlc-docs/inception/user-stories/stories.md)
 - [アプリケーション設計](./aidlc-docs/inception/application-design/application-design.md)
 - [ユニット定義](./aidlc-docs/inception/units/unit-of-work.md)
+
+AI-DLC プロセスの実践記録:
+
+- [AI-DLC 進捗状態](./aidlc-docs/aidlc-state.md) — フェーズ進捗・拡張ルール適用判定
+- [意思決定履歴（audit ログ）](./aidlc-docs/audit.md) — 全段階の質問・確定・承認の時系列記録
