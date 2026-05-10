@@ -5,7 +5,7 @@
 ![たびたび概要](assets/overview.png)
 
 三日坊主を繰り返すほど、AIが「次に始めたら面白そうなこと」を提案してくれる。  
-挫折を肯定し、ダメであるほどサービスが賢くなる構造を持つPWAアプリケーション。
+挫折を肯定し、ダメであるほどサービスが賢くなる構造を持つモバイルアプリケーション。
 
 ---
 
@@ -65,51 +65,38 @@
 
 ## アーキテクチャ
 
-```mermaid
-graph TD
-    subgraph Client
-        FE[Next.js 16 / PWA]
-    end
-
-    subgraph AWS
-        ALB[ALB]
-        subgraph ECS Fargate
-            DJ[Django + DRF]
-            TRIPS[trips]
-            ANALYSIS[analysis]
-            NOTIF[notifications]
-            SOCIAL[social]
-            UTILS[utils / AIService]
-        end
-        RDS[(RDS PostgreSQL)]
-        BEDROCK[Amazon Bedrock\nClaude]
-    end
-
-    FE -->|REST API| ALB
-    ALB --> DJ
-    DJ --- TRIPS
-    DJ --- ANALYSIS
-    DJ --- NOTIF
-    DJ --- SOCIAL
-    DJ --- UTILS
-    TRIPS --> RDS
-    ANALYSIS --> RDS
-    NOTIF --> RDS
-    SOCIAL --> RDS
-    UTILS --> BEDROCK
-```
+![アーキテクチャ図](assets/architecture.png)
 
 ### 技術スタック
 
 | レイヤー | 技術 |
 |---|---|
-| フロントエンド | Next.js 16（App Router, PWA, Service Worker） |
-| バックエンド | Django 5 + Django REST Framework |
-| データベース | Amazon RDS PostgreSQL |
+| モバイルアプリ | React Native + Expo（Managed Workflow） |
+| アプリ配信 | Expo EAS Build / EAS Submit → App Store / Google Play |
+| OTAアップデート | Expo Updates + Firebase |
+| Web版 | React SPA（PC/ブラウザ向け、PoC段階では後回し） |
+| バックエンド | Django REST Framework（EKS上の2 Deployment） |
+| コンテナ管理 | Amazon EKS（Kubernetes）、HPA によるオートスケール |
+| API公開 | ALB Ingress（Host-based routing） |
+| データベース | Amazon DocumentDB（MongoDB互換） |
 | AI | Amazon Bedrock（Claude） |
-| 通知 | PWA Push Notification |
-| インフラ | AWS ECS Fargate + ALB + RDS |
+| DWH | Snowflake（横断分析・BI基盤、S3 → Snowpipe連携） |
+| プッシュ通知 | Firebase Cloud Messaging（FCM） |
+| セキュリティ | WAF + Shield + Inspector + GuardDuty + CloudTrail |
+| 監視・ログ | Fluentd → Kinesis Data Firehose → Elasticsearch + Kibana |
+| アラート | CloudWatch Alarm → SNS → Slack |
+| DNS | Route 53 |
+| IaC | AWS CDK（Python） |
 | 認証 | 完全匿名（デバイスID、アカウント作成不要） |
+
+### EKS Worker 構成
+
+| Worker | 役割 | ルーティング |
+|---|---|---|
+| App Worker | Web版SPA配信 + Web向けAPI | web.tabitabi.example.com |
+| Backend Worker | モバイルAPI + バッチ処理 + CronJob | api.tabitabi.example.com |
+
+同じDRFプロジェクト、同じコードベース。環境変数 `WORKER_MODE` でモード切替。
 
 ### Django アプリ構成
 
@@ -117,49 +104,80 @@ graph TD
 |---|---|
 | `trips` | 旅のライフサイクル（開始・道中・途中下車） |
 | `analysis` | 横断分析・次の旅先提案 |
-| `notifications` | プッシュ通知スケジューリング |
+| `notifications` | プッシュ通知スケジューリング（FCM） |
 | `social` | 匿名タイムライン |
 
 ### 共通モジュール
 
 | パッケージ | 責務 | 備考 |
 |---|---|---|
-| `utils` | AIService（Bedrock連携）・デバイス認証ミドルウェア | Django アプリではない。モデルなし |
+| `utils` | AIService（Bedrock連携）・デバイス認証ミドルウェア・Snowflakeエクスポート | Django アプリではない。モデルなし |
 
 ---
 
 ## 開発ユニット
 
-優先度ベースで3ユニットに分割し、順次開発する。
+機能ドメイン別に8ユニットに分割。バックエンド → フロントエンド → インフラの順で開発。
 
-| # | ユニット | スコープ | ストーリー数 |
-|---|---|---|---|
-| 1 | 最小ループ（P1） | 旅に出る→途中下車→一覧 + 全インフラ基盤 | 10 |
-| 2 | 横断分析（P2） | パターン発見 + 次の旅先提案 | 2 |
-| 3 | 通知+ソーシャル（P3+P4） | プッシュ通知 + 匿名タイムライン | 3 |
+| # | ユニット | 種別 | 優先度 | スコープ |
+|---|---|---|---|---|
+| 1 | trips-backend | バックエンド | 最優先 | 旅のライフサイクル + 共通基盤（AIService, DeviceAuth） |
+| 2 | analysis-backend | バックエンド | 高 | 横断分析と次の旅先提案 |
+| 3 | notifications-backend | バックエンド | 中 | プッシュ通知スケジューリングとFCM送信 |
+| 4 | social-backend | バックエンド | 低 | 匿名タイムライン |
+| 5 | mobile-app | フロントエンド | 高 | React Native（Expo）モバイルアプリ |
+| 6 | web-app | フロントエンド | 低（後回し） | React SPA Web版 |
+| 7 | infrastructure-base | インフラ | 中 | EKS / DocumentDB / ALB / CDK基盤 |
+| 8 | infrastructure-security-monitoring | インフラ | 低 | WAF / Shield / 監視 / Snowflake連携 |
 
-Unit 2/3 は Unit 1 に依存。互いには独立。
+### 依存関係
+
+```
+Phase 1 (バックエンド):
+  Unit 1 (trips) ──→ Unit 2 (analysis)
+                 ──→ Unit 3 (notifications)
+                 ──→ Unit 4 (social)
+
+Phase 2 (フロントエンド):
+  Unit 5 (mobile) ──→ Unit 6 (web) [後回し]
+
+Phase 3 (インフラ):
+  Unit 7 (base) ──→ Unit 8 (security/monitoring)
+```
+
+Unit 2, 3, 4 は Unit 1 完了後に並行開発可能。
 
 ---
 
 ## プロジェクト構成
 
 ```
-aws-summit-japan-2026-hackathon/
-├── backend/                # Django プロジェクト
+tabitabi/
+├── backend/                # Django REST Framework プロジェクト
 │   ├── config/             # settings, urls, wsgi
+│   │   └── settings/      # base.py, development.py, production.py
 │   ├── trips/              # 旅のライフサイクル
 │   ├── analysis/           # 横断分析
 │   ├── notifications/      # 通知
 │   ├── social/             # ソーシャル
-│   ├── utils/              # 共通モジュール（AIService, 認証）※Djangoアプリではない
-│   └── manage.py
-├── frontend/               # Next.js プロジェクト
-│   ├── app/                # App Router
-│   ├── components/         # 共有コンポーネント
-│   ├── lib/                # API クライアント
-│   └── public/
-├── infra/                  # IaC
+│   ├── utils/              # 共通モジュール（AIService, 認証, Snowflake）
+│   ├── Dockerfile
+│   └── requirements.txt
+├── mobile/                 # React Native (Expo) モバイルアプリ
+│   ├── src/
+│   │   ├── navigation/     # Tab + Stack ナビゲーション
+│   │   ├── screens/        # 画面コンポーネント
+│   │   ├── components/     # 共通UIコンポーネント
+│   │   ├── api/            # APIクライアント
+│   │   └── hooks/
+│   └── package.json
+├── web/                    # React SPA（後回し）
+│   ├── src/
+│   └── package.json
+├── infra/                  # AWS CDK (Python)
+│   ├── stacks/             # networking, eks, documentdb, security, monitoring
+│   ├── k8s/                # Kubernetes マニフェスト
+│   └── cdk.json
 ├── aidlc-docs/             # 設計ドキュメント（AI-DLC）
 └── docker-compose.yml      # ローカル開発環境
 ```
@@ -174,6 +192,25 @@ aws-summit-japan-2026-hackathon/
 
 ---
 
+## v1 → v2 変更サマリー
+
+| 項目 | v1 | v2 |
+|---|---|---|
+| コンピュート | ECS Fargate（Django） | EKS（App Worker + Backend Worker） |
+| フロントエンド | Next.js PWA | React Native（Expo Managed）+ React SPA |
+| データベース | RDS PostgreSQL | DocumentDB（MongoDB互換） |
+| ORM | Django ORM | MongoEngine |
+| 通知 | PWA Push（Service Worker） | FCM（Firebase Cloud Messaging） |
+| バッチ実行 | ECS Scheduled Task | Kubernetes CronJob |
+| セキュリティ | 最小限（PoC） | フル構成（WAF/Shield/Inspector/GuardDuty/CloudTrail） |
+| 監視 | なし | Fluentd → Kinesis → Elasticsearch + Kibana |
+| DWH | なし | Snowflake（S3 → Snowpipe） |
+| IaC | なし | AWS CDK（Python） |
+| Worker構成 | 単一サービス | App Worker + Backend Worker（1 DRF / 2 Deployment） |
+| アラート | なし | Slack連携（SNS経由） |
+
+---
+
 ## 設計ドキュメント
 
 Inception フェーズの成果物は [`aidlc-docs/`](./aidlc-docs/) に格納:
@@ -181,7 +218,7 @@ Inception フェーズの成果物は [`aidlc-docs/`](./aidlc-docs/) に格納:
 - [要件定義](./aidlc-docs/inception/requirements/requirements.md)
 - [ユーザーストーリー](./aidlc-docs/inception/user-stories/stories.md)
 - [アプリケーション設計](./aidlc-docs/inception/application-design/application-design.md)
-- [ユニット定義](./aidlc-docs/inception/units/unit-of-work.md)
+- [ユニット定義](./aidlc-docs/inception/application-design/unit-of-work.md)
 
 AI-DLC プロセスの実践記録:
 

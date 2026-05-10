@@ -1,100 +1,162 @@
-# 要件確認 — フォローアップ質問
+# v2 要件フォローアップ質問
 
-前回の回答にいくつか迷いや曖昧な点がありましたので、以下の質問で明確にさせてください。
-
----
-
-## 背景情報（私からの補足）
-
-回答を分析した結果、以下の点を整理します：
-
-**Q1（プラットフォーム）について**: PWA は「Webベースだがモバイルアプリ的な体験」を提供します。プッシュ通知（Q6でA選択）もPWAで対応可能です。ネイティブアプリ（React Native等）と比較すると：
-- **PWA**: Web技術のみで開発、ストア申請不要、プッシュ通知対応、オフライン対応可能。ただしiOSでは一部制限あり（通知許可のUXがやや劣る）
-- **React Native**: ネイティブに近い体験、ストア配信可能、通知が安定。ただし開発コスト増
-
-**Q2（認証）について**: 「アカウント作成が面倒」という観点は重要です。選択肢として：
-- **匿名認証（デバイス紐付け）**: アカウント作成不要でデバイス内にデータ保持。機種変更時にデータ移行不可
-- **オプショナル認証**: 最初は匿名で使い始め、後からアカウント連携（Google等）でバックアップ可能にする
-
-**Q4（インフラ）について**: Docker経験があるとのことですが、ハッカソンのPoC規模（〜100人）であれば：
-- **ECS Fargate**: Docker慣れしていれば自然。ただしコスト面でLambdaより高い
-- **Lambda + API Gateway**: サーバーレスで運用コストほぼゼロ。Dockerイメージも使える（Lambda Container Image）
-- **App Runner**: Dockerイメージをそのままデプロイ。ECSより設定が簡単
-
-**Q9（データ永続化）について**: 「他の人の卒業を見せる」機能は面白いですが、PoC段階では：
-- まずローカル（またはデバイス紐付けクラウド）で個人データのみ
-- ソーシャル機能は将来拡張として位置づけ
+参照ドキュメント（`references/docs/aws_architecture.md`）と回答を分析した結果、以下の確認が必要です。
 
 ---
 
-## Clarification Question 1
-プラットフォームについて、上記の補足を踏まえてどちらにしますか？
+## CQ1: EKS vs サーバーレス
 
-A) PWA — Web技術のみで開発。プッシュ通知対応。ストア申請不要。ハッカソンPoC向けに最適
-B) React Native（Expo） — ネイティブアプリ体験。ストア配信可能。開発コストはやや増
-C) PWA で開始し、将来的にネイティブ化を検討
-X) Other (please describe after [Answer]: tag below)
+参照ドキュメントはEKS（Kubernetes）ベースのマイクロサービス構成です。
+一方、aidlc-state.md の v2 Architecture Revision History には「Lambda + 他変更予定」と記載されています。
 
-[Answer]: 最終的に決勝でデモができればいいわけですよね。ならAでいいのかな？
+「たびたび」のPoC規模（〜100人）を考えると、EKSはオーバースペックの可能性があります。
+どちらの方向で進めますか？
 
----
+A) 参照ドキュメント通りEKSベースで構築する（本格的なマイクロサービス）
+B) 参照ドキュメントの構成思想（レイヤー分離、監視等）は参考にしつつ、コンピュートはLambdaベースにする（PoC規模に適正化）
+C) ECS Fargate で中間を取る（v1に近いがコンテナ分離を強化）
+D) 参照ドキュメントの構成をそのまま採用し、規模は気にしない（学習・アピール目的）
+E) Other (please describe after [Answer]: tag below)
 
-## Clarification Question 2
-認証方式について、上記の補足を踏まえてどちらにしますか？
-
-A) 完全匿名（デバイス紐付け） — アカウント作成ゼロ。データはデバイス内のみ。最もシンプル
-B) オプショナル認証 — 最初は匿名で使い始め、後からGoogleログイン等でバックアップ可能にする
-C) ソーシャルログインのみ（Google/Apple） — ワンタップで完了。データはクラウド保存
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: 現状はAでいい気もします。
+[Answer]: Kubernetesの技術はあるので、Aでいいかなと思っています。どうでしょうか？
 
 ---
 
-## Clarification Question 3
-バックエンドのインフラについて、上記の補足を踏まえてどちらにしますか？
+## CQ2: DocumentDB vs DynamoDB
 
-A) AWS App Runner — Dockerイメージをそのままデプロイ。ECSより設定簡単。Docker経験を活かせる
-B) AWS Lambda（Container Image） — Dockerイメージを使えるサーバーレス。コストほぼゼロ。PoC向け最適
-C) ECS Fargate — フルコンテナ環境。Docker経験を最大限活かせる。ただしPoC規模にはオーバースペック気味
-X) Other (please describe after [Answer]: tag below)
+参照ドキュメントではDocumentDBが使われています。
+「たびたび」のデータ構造（旅、道標、景色、分析結果）を考えると:
 
-[Answer]: Bかな？ここはあまり詳しくないので分かりませんが。
+- **DocumentDB**: MongoDB互換、柔軟なスキーマ、クエリが豊富。ただし常時起動でコストがかかる（最小 ~$60/月）
+- **DynamoDB**: サーバーレス、従量課金、PoC規模ならほぼ無料。ただしクエリパターンの事前設計が必要
 
----
+どちらを採用しますか？
 
-## Clarification Question 4
-データ永続化について、PoC段階での方針を決めてください。
+A) DocumentDB（参照ドキュメントに合わせる）
+B) DynamoDB（PoC規模のコスト最適化を優先）
+C) DynamoDB をメインにしつつ、横断分析など複雑なクエリが必要な部分だけ別の手段を検討
+D) Other (please describe after [Answer]: tag below)
 
-A) ローカルストレージのみ — 認証不要。最もシンプル。ソーシャル機能は将来拡張
-B) DynamoDB（デバイスID紐付け） — アカウント不要だがクラウド保存。将来のアカウント連携に拡張しやすい
-C) DynamoDB（認証連携） — アカウント必須だが複数デバイス同期可能
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: 他の人の卒業が流れてくる、というような機能をもし作るならどれになります？B？デバイスIDで自動的に紐づけられるならユーザーには手間がないのかな。
+[Answer]: コスト部分は許容できるので、Aで進めてみましょうか。
 
 ---
 
-## Clarification Question 5
-フロントエンドについて、Q1のプラットフォーム選択と合わせて確認します。PWAを選んだ場合、Next.jsで問題なく構築できます。
+## CQ3: React Native のビルド・配信
 
-A) Next.js（React） — SSR/SSG対応、PWA化も容易、エコシステム充実
-B) Vite + React — 軽量SPA、PWA化可能、ビルド高速
-C) React Native（Expo） — Q1でBを選んだ場合のみ。モバイルネイティブ
-X) Other (please describe after [Answer]: tag below)
+参照ドキュメントではExpo + Firebaseが使われています。React Nativeに変更するとのことですが:
+
+A) Expo（Managed Workflow）を使う — ビルド・配信が楽、ただしネイティブモジュールに制約あり
+B) Expo（Bare Workflow / Development Build）を使う — 柔軟性あり、Expoのビルドサービスも利用可能
+C) React Native CLI（Expo不使用）— 完全な自由度、ただしビルド環境の構築が必要
+D) Other (please describe after [Answer]: tag below)
 
 [Answer]: A
 
 ---
 
-## Clarification Question 6
-書類審査の締切が **5月10日（日）23:59** ですが、今日は5月9日です。書類審査に必要なのはInceptionフェーズの成果物（README、設計ドキュメント）です。
+## CQ4: プッシュ通知の実装方式
 
-A) 書類審査に間に合わせることを最優先 — Inceptionフェーズの成果物を今日中に完成させる
-B) 書類審査は気にせず、自分のペースで進める — 予選（5/30）に向けてMVPを作ることを優先
-C) 書類審査の成果物を最低限出しつつ、予選に向けて開発も進める
-X) Other (please describe after [Answer]: tag below)
+v1ではPWA Push Notification（Service Worker）でしたが、React Nativeに変更するため通知方式も変わります。
+参照ドキュメントではFirebaseが使われています。
 
-[Answer]: 普通にやったらInceptionフェーズは今日終わると思っています。もちろん書類審査は最優先ですが、特別急ぐ必要はないのでは？
+A) Firebase Cloud Messaging（FCM）— React Nativeとの相性が良い、iOS/Android両対応
+B) Amazon SNS + FCM/APNs — AWS寄せにする場合
+C) Expo Notifications — Expoを使う場合はこれが最も簡単
+D) Other (please describe after [Answer]: tag below)
+
+[Answer]: A
 
 ---
+
+## CQ5: IaC（Infrastructure as Code）
+
+参照ドキュメントにはIaCツールの記載がありませんでした。
+v2のインフラ構築にIaCを使いますか？
+
+A) AWS CDK（TypeScript）
+B) AWS CDK（Python）
+C) AWS SAM（Serverless Application Model）— Lambda中心なら相性が良い
+D) Terraform
+E) IaCは使わない（手動構築 or スクリプト）
+F) Other (please describe after [Answer]: tag below)
+
+[Answer]: B
+
+---
+
+## CQ6: セキュリティ層の扱い
+
+参照ドキュメントにはWAF/Shield、Inspector、GuardDuty、CloudTrail等のセキュリティ層がありますが、「セキュリティ部分は抜いてしまっても良い」とのことでした。
+
+確認: 以下のうちどこまで含めますか？
+
+A) セキュリティ関連は全て除外（WAF, Shield, Inspector, GuardDuty, CloudTrail 全て不要）
+B) WAF だけ入れる（API保護の最低限）
+C) CloudTrail だけ入れる（監査ログとして有用）
+D) 最低限のセット（WAF + CloudTrail）を入れる
+E) Other (please describe after [Answer]: tag below)
+
+[Answer]: やっぱり全部入れます。
+
+---
+
+## CQ7: 監視・ログ基盤
+
+参照ドキュメントではFluentd → Kinesis Data Firehose → Elasticsearch + Kibana の構成ですが、PoC規模では:
+
+A) CloudWatch のみ（最小限、追加コストほぼなし）
+B) CloudWatch + 簡易ダッシュボード（CloudWatch Dashboards）
+C) 参照ドキュメント通り（Kinesis + Elasticsearch）— 本格的だがコスト大
+D) Other (please describe after [Answer]: tag below)
+
+[Answer]: C
+
+---
+
+## CQ8: SIEM・Slack連携
+
+参照ドキュメントにはSIEM（Elasticsearch + Kibana）とSlackアラート連携がありますが:
+
+A) 不要（PoC段階では過剰）
+B) Slackアラートだけ入れる（CloudWatch Alarm → SNS → Slack）
+C) 参照ドキュメント通りフル構成
+D) Other (please describe after [Answer]: tag below)
+
+[Answer]: B
+
+---
+
+## CQ9: 仮置き用語の確定
+
+Q8で「確定させたい」とのことでした。以下の候補から選ぶか、別案を記載してください。
+
+### 一覧画面の名称
+A) 旅の地図（v1仮置き）
+B) 旅の記録
+C) これまでの旅
+D) Other (please describe after [Answer]: tag below)
+
+[Answer]: B
+
+### 横断分析 + 次の提案の名称
+A) 次の旅先（v1仮置き）
+B) 旅のパターン
+C) あなたの方角
+D) Other (please describe after [Answer]: tag below)
+
+[Answer]: C
+
+---
+
+## CQ10: App Worker / Backend Worker の分離
+
+参照ドキュメントではApp Worker（フロントエンド向け）とBackend Worker（モバイル向け + バッチ処理）が分離されています。
+React Nativeアプリの場合、バックエンドAPIは1つで良いと思いますが:
+
+A) API は1つのサービスにまとめる（PoC規模なら十分）
+B) 参照ドキュメントに合わせてWorkerを分離する（API用 + バッチ処理用）
+C) API用とバッチ処理用は分離するが、API自体は1つ
+D) Other (please describe after [Answer]: tag below)
+
+[Answer]: 一旦ドキュメントに合わせていいでしょうか。B
+

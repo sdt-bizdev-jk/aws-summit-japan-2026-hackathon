@@ -1,172 +1,126 @@
-# 要件確認質問
+# v2 要件確認質問
 
-以下の質問に回答してください。各質問の `[Answer]:` タグの後に選択肢の文字を記入してください。
-選択肢に合うものがない場合は、最後の選択肢（Other）を選び、`[Answer]:` タグの後に説明を記入してください。
+v1（Django + ECS Fargate + RDS PostgreSQL）からのアーキテクチャ変更と要件追記修正を確認します。
+v1の成果物は `aidlc-docs/inception-v1/` に退避済みです。
 
 ---
 
 ## Question 1
-このプロジェクトのターゲットプラットフォームは何ですか？
+アーキテクチャ変更の主な動機は何ですか？
 
-A) Webアプリケーション（ブラウザベース）
-B) モバイルアプリ（iOS/Android）
-C) Webアプリ + モバイルアプリ（両方）
-D) PWA（Progressive Web App）— Webベースだがモバイルアプリ的な体験
-X) Other (please describe after [Answer]: tag below)
+A) コスト削減（ECS Fargate + RDS は PoC には高い）
+B) 開発スピード向上（サーバーレスの方がデプロイが楽）
+C) ハッカソン審査でのAWSサービス活用アピール
+D) 運用負荷の軽減（マネージドサービスに寄せたい）
+E) 複数の理由がある（[Answer]: の後に説明してください）
+F) Other (please describe after [Answer]: tag below)
 
-[Answer]: BかD、Dでも実現可能なんでしょうか。
+[Answer]: E、チームにAWSサービスの活用経験が豊富なメンバーがおり、なら手間をかけてもAWSサービスにしっかり寄せようかという話になりました。
 
 ---
 
 ## Question 2
-ユーザー認証はどの方式を想定していますか？
+バックエンドのアーキテクチャとして、どの方向を考えていますか？
 
-A) メールアドレス + パスワード
-B) ソーシャルログイン（Google, Apple等）
-C) メール + ソーシャルログインの両方
-D) 認証なし（匿名利用のみ）
-X) Other (please describe after [Answer]: tag below)
+A) AWS Lambda + API Gateway（Python、関数単位）
+B) AWS Lambda + API Gateway（Python、フレームワーク統合 — e.g. Mangum + Django/FastAPI）
+C) AWS Lambda + Function URL（フレームワーク統合）
+D) AWS App Runner（コンテナだが ECS より軽量運用）
+E) Other (please describe after [Answer]: tag below)
 
-[Answer]: わざわざアカウントを作るのが面倒ですよね。Dができればいいですが、何らかの認証・連携は必要な気もします。
+[Answer]: 参考にしたい構成があるので、 references/docs/aws-architecture.md を見てください。
+セキュリティ部分は抜いてしまっても良いかなと考えています。
+本サービスと大きく食い違うような部分がない限り、この構成に合わせようと思っています。
 
 ---
 
 ## Question 3
-AI機能（マイルストーン生成、「得たもの」提示、横断分析）に使用するAIサービスはどれを想定していますか？
+データベースについて、どの方向を考えていますか？
 
-A) Amazon Bedrock（Claude, Titan等）
-B) OpenAI API（GPT-4等）
-C) 自前のモデル / セルフホスト
-D) まだ決めていない（推奨を提案してほしい）
-X) Other (please describe after [Answer]: tag below)
+A) DynamoDB（サーバーレスに合わせてフルマネージド NoSQL）
+B) Aurora Serverless v2（PostgreSQL互換、使った分だけ課金）
+C) DynamoDB + 一部 RDS（ハイブリッド）
+D) v1のまま RDS PostgreSQL を維持
+E) Other (please describe after [Answer]: tag below)
 
-[Answer]: A
+[Answer]: Q2に同じく、こちらもmdファイルを参照してください。
 
 ---
 
 ## Question 4
-バックエンドのインフラ/デプロイ先はどこを想定していますか？
+フロントエンドのホスティングについて変更はありますか？
 
-A) AWS（Lambda, API Gateway, DynamoDB等のサーバーレス構成）
-B) AWS（ECS/EKS等のコンテナ構成）
-C) その他のクラウド（GCP, Azure等）
-D) まだ決めていない（推奨を提案してほしい）
-X) Other (please describe after [Answer]: tag below)
+A) AWS Amplify Hosting（Next.js SSR対応、v1想定のまま）
+B) CloudFront + S3（静的エクスポート、SSR不要にする）
+C) Lambda@Edge / CloudFront Functions で SSR
+D) フロントエンドは変更なし（Next.js + Amplify のまま）
+E) Other (please describe after [Answer]: tag below)
 
-[Answer]: Dockerに慣れているので、この場合はBになりますか？
+[Answer]: PWAでなく、ネイティブアプリに変更しようと考えています。React Native予定です。
 
 ---
 
 ## Question 5
-フロントエンドの技術スタックはどれを想定していますか？
+v1の機能要件（FR-01〜FR-07）について、追加・変更・削除したいものはありますか？
 
-A) React（Next.js）
-B) React（Vite / SPA）
-C) Vue.js（Nuxt.js）
-D) まだ決めていない（推奨を提案してほしい）
-X) Other (please describe after [Answer]: tag below)
+A) 機能要件は変更なし（アーキテクチャのみ変更）
+B) 一部機能を削除してスコープを絞りたい（[Answer]: の後に対象を記載）
+C) 新しい機能を追加したい（[Answer]: の後に内容を記載）
+D) 既存機能の優先度を変更したい（[Answer]: の後に内容を記載）
+E) 複数の変更がある（[Answer]: の後に詳細を記載）
+F) Other (please describe after [Answer]: tag below)
 
-[Answer]: Aだと楽ですが、モバイルだと他のになるんでしょうか。
+[Answer]: 機能要件については現状維持、ただドキュメントの書き方が最初から旅の比喩を使っていて伝わりづらいかなという懸念があります。
+用語の対応関係などはいいと思っているので、旅の話をする前に元の三日坊主などの、比喩を使わない説明パートがあった方がいいと思いました。
+大枠としてはこんな感じですね。
 
 ---
 
 ## Question 6
-通知機能（マイルストーンベースの軽い通知）の配信方法はどれを想定していますか？
+非機能要件について変更したい点はありますか？
 
-A) プッシュ通知（ブラウザ / モバイル）
-B) メール通知
-C) アプリ内通知のみ（次回アクセス時に表示）
-D) プッシュ通知 + アプリ内通知の組み合わせ
-X) Other (please describe after [Answer]: tag below)
+A) 変更なし
+B) 認証方式を変更したい（匿名デバイスID → 別方式）
+C) パフォーマンス要件を変更したい
+D) ユーザー規模の想定を変更したい
+E) 複数の変更がある（[Answer]: の後に詳細を記載）
+F) Other (please describe after [Answer]: tag below)
 
-[Answer]: A
+[Answer]: こちらも変更なしですが、上述のmdファイルと食い違った場合は質問してください。
 
 ---
 
 ## Question 7
-想定ユーザー規模はどの程度ですか？（初期リリース時）
+IaC（Infrastructure as Code）について、どのツールを使いたいですか？
 
-A) 小規模（〜100人）— ハッカソンデモ / PoC
-B) 中規模（100〜1,000人）— 限定公開ベータ
-C) 大規模（1,000人以上）— 一般公開
-D) まだ決めていない
-X) Other (please describe after [Answer]: tag below)
+A) AWS CDK（TypeScript）
+B) AWS CDK（Python）
+C) AWS SAM（Serverless Application Model）
+D) Terraform
+E) IaCは使わない（マネジメントコンソール or CLI で手動構築）
+F) Other (please describe after [Answer]: tag below)
 
-[Answer]: A
+[Answer]: まずmdファイルを見て、記載がなければ改めて質問してください。
 
 ---
 
 ## Question 8
-「フェードアウト後にそっと確認」の判定ロジックについて、どの程度の期間無活動で「卒業候補」とみなしますか？
+v1で「仮置き」としていた用語（一覧画面 = "旅の地図"、横断分析 = "次の旅先"）について、確定させたいですか？
 
-A) 3日間無活動
-B) 7日間無活動
-C) 14日間無活動
-D) ユーザーが自分で期間を設定できる
-X) Other (please describe after [Answer]: tag below)
+A) はい、この機会に確定させたい
+B) いいえ、仮置きのまま進める
+C) 別の案がある（[Answer]: の後に記載）
+D) Other (please describe after [Answer]: tag below)
 
-[Answer]: ここは重要ですね。長すぎてもあれなので、Aがいい気もします。
+[Answer]: Aで、一旦確定させましょうか。
 
 ---
 
 ## Question 9
-データの永続化（ユーザーの卒業履歴、得たもの等）はどこに保存しますか？
+その他、v2で変更・追加したい要件や設計方針があれば自由に記載してください。
 
-A) クラウドデータベース（DynamoDB, RDS等）— アカウント連携で複数デバイス同期
-B) ローカルストレージのみ（ブラウザ / デバイス内）— アカウント不要
-C) クラウド + ローカルキャッシュのハイブリッド
-D) まだ決めていない（推奨を提案してほしい）
-X) Other (please describe after [Answer]: tag below)
+A) 特になし（上記の質問で網羅されている）
+B) あり（[Answer]: の後に記載）
 
-[Answer]: アカウントなしならBになりますが、もし「他の人の卒業を見せる」みたいな機能も入れるならAかCになるんでしょうか。要相談。
+[Answer]: これまでのQで大体かけたかなと思います。A
 
----
-
-## Question 10
-ハッカソンの制約について教えてください。提出期限や技術的な制約はありますか？
-
-A) 期限あり（具体的な日時を[Answer]:の後に記入してください）
-B) 特に期限なし — 自分のペースで開発
-C) AWS サービスの使用が必須条件
-D) AとCの両方（期限あり + AWS必須）
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: Aで、 # aws-summit-2026-hackathon.md に記載はしてありますが、意識せずとも間に合うのではと思っています。
-
----
-
-## Question 11
-多言語対応は必要ですか？
-
-A) 日本語のみ
-B) 日本語 + 英語
-C) 多言語対応（3言語以上）
-D) まだ決めていない
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: A
-
----
-
-## Question 12: セキュリティ拡張
-このプロジェクトにセキュリティ拡張ルールを適用しますか？
-
-A) はい — すべてのセキュリティルールをブロッキング制約として適用する（本番グレードのアプリケーション向け推奨）
-B) いいえ — セキュリティルールをスキップする（PoC、プロトタイプ、実験的プロジェクト向け）
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: B
-
----
-
-## Question 13: プロパティベーステスト拡張
-このプロジェクトにプロパティベーステスト（PBT）ルールを適用しますか？
-
-A) はい — すべてのPBTルールをブロッキング制約として適用する（ビジネスロジック、データ変換、シリアライゼーション、ステートフルコンポーネントを持つプロジェクト向け推奨）
-B) 部分的 — 純粋関数とシリアライゼーションのラウンドトリップにのみPBTルールを適用する
-C) いいえ — PBTルールをスキップする（シンプルなCRUDアプリ、UIのみのプロジェクト、薄い統合レイヤー向け）
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: C
-
----

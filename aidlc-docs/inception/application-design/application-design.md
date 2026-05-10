@@ -1,7 +1,8 @@
-# アプリケーション設計 — 統合ドキュメント
+# アプリケーション設計 — 統合ドキュメント（v2）
 
 ## 概要
-「たびたび」のアプリケーション設計を統合的にまとめる。
+「たびたび」v2のアプリケーション設計を統合的にまとめる。
+v1（Django + Next.js + RDS）からv2（EKS + React Native + Web SPA + DocumentDB）への再設計。
 詳細は各個別ドキュメントを参照。
 
 ---
@@ -9,36 +10,40 @@
 ## アーキテクチャ概要
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Frontend (Next.js 16)                  │
-│              App Router + PWA + Service Worker            │
-└─────────────────────┬───────────────────────────────────┘
-                      │ HTTP (REST API)
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│                    ALB (Application Load Balancer)        │
-└─────────────────────┬───────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│              Django (ECS Fargate)                         │
-│  ┌──────────┐ ┌──────────┐ ┌───────────────┐ ┌───────┐ │
-│  │  trips   │ │ analysis │ │ notifications │ │social │ │
-│  └────┬─────┘ └────┬─────┘ └──────┬────────┘ └───┬───┘ │
-│       │             │              │              │      │
-│       └─────────────┴──────────────┴──────────────┘      │
-│                         │                                │
-│              ┌──────────┴──────────┐                     │
-│              │   utils/AIService   │                     │
-│              └──────────┬──────────┘                     │
-└─────────────────────────┼───────────────────────────────┘
-                          │
-              ┌───────────┼───────────┐
-              ▼                       ▼
-┌──────────────────┐    ┌──────────────────────┐
-│  RDS PostgreSQL  │    │  Amazon Bedrock      │
-│  (データ永続化)   │    │  (Claude - AI生成)    │
-└──────────────────┘    └──────────────────────┘
+┌──────────────────────┐  ┌──────────────────────────┐
+│  React Native (Expo) │  │   React SPA (Web版)      │
+│  iOS / Android       │  │   PC / ブラウザ           │
+└──────────┬───────────┘  └────────────┬─────────────┘
+           │                           │
+           │ HTTP (REST API)           │ HTTP (REST API + SPA配信)
+           ▼                           ▼
+┌──────────────────────────────────────────────────────────┐
+│              ALB Ingress (WAF + Shield)                    │
+│  Mobile → Backend Worker  |  Web → App Worker             │
+└──────────────────────┬───────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────┐
+│              Django REST Framework (EKS)                   │
+│              1つのDRFプロジェクト / 2 Deployments           │
+│                                                          │
+│  ┌──────────┐ ┌──────────┐ ┌───────────────┐ ┌───────┐  │
+│  │  trips   │ │ analysis │ │ notifications │ │social │  │
+│  └────┬─────┘ └────┬─────┘ └──────┬────────┘ └───┬───┘  │
+│       │             │              │              │       │
+│       └─────────────┴──────────────┴──────────────┘       │
+│                         │                                 │
+│              ┌──────────┴──────────┐                      │
+│              │   utils/AIService   │                      │
+│              └──────────┬──────────┘                      │
+└──────────────────────────┼────────────────────────────────┘
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+┌──────────────────┐ ┌──────────┐ ┌─────────┐
+│   DocumentDB     │ │ Bedrock  │ │   FCM   │
+│  (MongoDB互換)   │ │ (Claude) │ │ (通知)  │
+└──────────────────┘ └──────────┘ └─────────┘
 ```
 
 ---
@@ -47,38 +52,41 @@
 
 | 決定事項 | 選択 | 理由 |
 |---|---|---|
-| Django アプリ分割 | 機能ドメイン別4アプリ | 責務の明確な分離、独立した開発・テスト |
-| AI連携パターン | AIService に集約 | プロンプト一元管理、エラーハンドリング統一 |
-| フロントエンド構成 | App Router + レイアウト共有 | Next.js 16 推奨パターン、コード共有が容易 |
-| 通知方式 | ユーザーごと時刻設定 + バッチ送信 | 柔軟性と実装シンプルさのバランス |
-| ソーシャルデータ取得 | 単純DB読み取り | PoC規模で十分、オーバーエンジニアリング回避 |
+| バックエンド | Django REST Framework | v1の知見活用、チーム経験 |
+| データモデル方針 | 参照型（コレクション分離） | v1のRDB設計をそのまま移行可能、柔軟性確保 |
+| Worker構成 | 1 DRF プロジェクト / 2 Deployment | コードベース共通、ALBで振り分け |
+| App Worker | Web版（エンドユーザー向け）配信 + API | PC/ブラウザ向けサービス |
+| Backend Worker | モバイルAPI + バッチ処理 | React Native向け + CronJob |
+| Django アプリ分割 | 機能ドメイン別4アプリ | v1踏襲、責務の明確な分離 |
+| AI連携パターン | AIService に集約 | v1踏襲、プロンプト一元管理 |
+| モバイルナビゲーション | Tab Navigation（下部4タブ）+ Stack | 機能数に適合、設定はStack |
+| 通知方式 | FCM（Firebase Cloud Messaging） | React Native ネイティブ対応 |
+| Snowflake連携 | バッチ（DocumentDB → S3 → Snowpipe） | PoC段階で十分、シンプル |
+| ORM | MongoEngine | DocumentDB（MongoDB互換）対応 |
 
 ---
 
 ## コンポーネント構成
 
-### バックエンド（Django）
+### バックエンド（Django REST Framework）
 
-| アプリ | 責務 | 主要モデル |
+| アプリ | 責務 | 主要コレクション |
 |---|---|---|
-| trips | 旅のライフサイクル管理 | Trip, Milestone, Progress, Scenery |
-| analysis | 横断分析・次の旅先提案 | AnalysisResult, Suggestion |
-| notifications | 通知スケジューリング・送信 | NotificationSchedule, NotificationLog |
-| social | 匿名タイムライン | （tripsのモデルを参照） |
+| trips | 旅のライフサイクル管理 | trips, milestones, progress, sceneries |
+| analysis | 横断分析・次の旅先提案 | analysis_results, suggestions |
+| notifications | 通知スケジューリング・FCM送信 | notification_schedules, notification_logs, device_tokens |
+| social | 匿名タイムライン | （tripsコレクションを参照） |
 
 | 共通パッケージ | 責務 | 備考 |
 |---|---|---|
-| utils | AI連携（AIService）・デバイス認証ミドルウェア | Djangoアプリではない。モデルなし。各アプリからインポートして使う共通モジュール |
+| utils | AI連携（AIService）・デバイス認証ミドルウェア・Snowflakeエクスポート | Djangoアプリではない。各アプリからインポートして使う共通モジュール |
 
-### フロントエンド（Next.js 16）
+### フロントエンド
 
-| ルート | 画面 | 対応機能 |
+| プラットフォーム | 技術 | 配信方式 |
 |---|---|---|
-| `/` | ホーム（一覧画面） | FR-04: 途中下車した旅の一覧 |
-| `/trips/new` | 旅に出る | FR-01: 旅の開始 |
-| `/trips/[id]` | 旅の詳細 | FR-02, FR-03: 道中・途中下車 |
-| `/analysis` | 横断分析 | FR-05: パターン発見・提案 |
-| `/timeline` | タイムライン | FR-06: ソーシャル機能 |
+| モバイル | React Native + Expo (Managed) | App Store / Google Play + OTA |
+| Web | React SPA | App Worker が静的ファイル配信 |
 
 ---
 
@@ -88,19 +96,20 @@
 |---|---|---|
 | TripService | 旅の作成、途中下車処理、フェードアウト検出 | ○ |
 | AnalysisService | パターン分析、提案生成 | ○ |
-| NotificationService | スケジュール管理、バッチ送信 | ○ |
+| NotificationService | スケジュール管理、FCM送信 | ○ |
 | SocialService | 匿名タイムライン取得 | × |
 
 | 共通モジュール | 主要責務 | 備考 |
 |---|---|---|
-| AIService | Bedrock呼び出し集約、プロンプト管理 | utils パッケージ内。各サービスからインポート |
+| AIService | Bedrock呼び出し集約、プロンプト管理 | utils パッケージ内 |
+| SnowflakeExportService | DocumentDB → S3 エクスポート | utils パッケージ内 |
 
 ---
 
 ## 依存関係
 
 ```
-utils/ (共通パッケージ: AIService, DeviceAuthMiddleware)  ← 最下層、依存なし
+utils/ (共通パッケージ: AIService, DeviceAuthMiddleware, SnowflakeExport)  ← 最下層
     ↑
 trips              ← utils, notifications に依存
     ↑
@@ -109,38 +118,82 @@ notifications      ← trips, utils に依存
 social             ← trips に依存
 ```
 
-循環依存なし。依存方向は常に一方向。utils は Django アプリではなく共通 Python パッケージ。
+循環依存なし。依存方向は常に一方向。
 
 ---
 
 ## API エンドポイント一覧
 
-| メソッド | パス | 機能 |
-|---|---|---|
-| POST | `/api/trips/` | 旅を開始 |
-| GET | `/api/trips/` | 旅の一覧取得 |
-| GET | `/api/trips/{id}/` | 旅の詳細取得 |
-| POST | `/api/trips/{id}/progress/` | 進捗報告 |
-| POST | `/api/trips/{id}/drop_off/` | 途中下車 |
-| POST | `/api/trips/{id}/confirm_fadeout/` | フェードアウト確認応答 |
-| GET | `/api/analysis/` | 横断分析結果取得 |
-| GET | `/api/analysis/suggestions/` | 次の旅先提案取得 |
-| PUT | `/api/notifications/{trip_id}/schedule/` | 通知時刻設定 |
-| POST | `/api/notifications/subscribe/` | Push Subscription 登録 |
-| GET | `/api/timeline/` | 匿名タイムライン取得 |
+| メソッド | パス | 機能 | 対応FR |
+|---|---|---|---|
+| POST | `/api/trips/` | 旅を開始 | FR-01 |
+| GET | `/api/trips/` | 旅の一覧取得 | FR-04 |
+| GET | `/api/trips/{id}/` | 旅の詳細取得 | FR-04 |
+| POST | `/api/trips/{id}/progress/` | 進捗報告 | FR-02 |
+| POST | `/api/trips/{id}/drop_off/` | 途中下車 | FR-03 |
+| POST | `/api/trips/{id}/confirm_fadeout/` | フェードアウト確認応答 | FR-03 |
+| GET | `/api/analysis/` | 横断分析結果取得 | FR-05 |
+| GET | `/api/analysis/suggestions/` | 次の旅先提案取得 | FR-05 |
+| PUT | `/api/notifications/{trip_id}/schedule/` | 通知時刻設定 | FR-07 |
+| POST | `/api/notifications/device-token/` | FCMデバイストークン登録 | FR-07 |
+| GET | `/api/timeline/` | 匿名タイムライン取得 | FR-06 |
 
-全エンドポイントは `X-Device-ID` ヘッダー（UUID形式）によるデバイス認証を使用。Device テーブルは持たず、各モデルの `device_id: UUIDField` で直接紐付ける。
+全エンドポイントは `X-Device-ID` ヘッダー（UUID形式）によるデバイス認証を使用。
 
 ---
 
-## バッチ処理
+## バッチ処理（Kubernetes CronJob）
 
-| コマンド | 実行頻度 | 処理内容 |
+| CronJob | 実行頻度 | 処理内容 | 実行Worker |
+|---|---|---|---|
+| `send-notifications` | 毎分 | 送信時刻に達した通知をFCM送信 | Backend Worker |
+| `check-fadeout` | 1日1回 | 3日間無活動の旅を検出し確認通知を送信 | Backend Worker |
+| `export-to-snowflake` | 1日1回 | DocumentDB → S3 エクスポート | Backend Worker |
+
+---
+
+## EKS Worker 構成
+
+| Worker | 役割 | ルーティング |
 |---|---|---|
-| `python manage.py send_notifications` | 毎分 | 送信時刻に達した通知を処理 |
-| `python manage.py check_fadeout` | 1日1回 | 3日間無活動の旅を検出 |
+| App Worker | Web版SPA配信 + Web向けAPI | Host-based (web.tabitabi.example.com) |
+| Backend Worker | モバイルAPI + バッチ + CronJob | Host-based (api.tabitabi.example.com) |
 
-ECS Scheduled Task（CloudWatch Events）で定期実行。
+- 同じDRFプロジェクト、同じコードベース
+- 環境変数 `WORKER_MODE=app|backend` でモード切替
+- HPA（Horizontal Pod Autoscaler）でオートスケール
+
+---
+
+## モバイル ナビゲーション構成
+
+```
+TabNavigator (下部4タブ)
+├── 旅の記録 (TripList → TripDetail)
+├── 旅に出る (TemplateSelect / FreeInput → TripStarted)
+├── 横断分析 (AnalysisView → SuggestionDetail)
+└── タイムライン (TimelineFeed)
+
+StackNavigator (タブ外)
+├── Settings (設定)
+├── NotificationSettings (通知設定)
+└── TripDropOff (途中下車フロー)
+```
+
+---
+
+## v1 → v2 設計変更サマリ
+
+| 項目 | v1 | v2 |
+|---|---|---|
+| バックエンド | Django (ECS Fargate) | Django REST Framework (EKS) |
+| ORM | Django ORM (PostgreSQL) | MongoEngine (DocumentDB) |
+| フロントエンド | Next.js 16 (PWA) | React Native (Expo) + React SPA |
+| 通知 | PWA Push (Service Worker) | FCM (firebase-admin) |
+| バッチ実行 | ECS Scheduled Task | Kubernetes CronJob |
+| Worker構成 | 単一サービス | App Worker + Backend Worker (1 DRF) |
+| データモデル | RDB テーブル | DocumentDB コレクション（参照型） |
+| Snowflake連携 | なし | バッチ（S3 → Snowpipe） |
 
 ---
 
