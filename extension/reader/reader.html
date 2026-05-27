@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WaitLess - 読書</title>
+  <link rel="stylesheet" href="reader.css">
+</head>
+<body>
+  <main class="reader-container">
+    <header class="reader-header">
+      <h1 class="novel-title" data-testid="novel-title">待つことについて</h1>
+      <p class="novel-author" data-testid="novel-author">サンプルテキスト</p>
+    </header>
+
+    <article id="reader-content"
+             class="reader-content"
+             data-testid="reader-content"
+             aria-label="本文 (クリックで既読範囲を更新します)">
+      <!-- ReaderApp.renderText() が動的に <p class="paragraph"> を挿入 -->
+      <p class="reader-loading" data-testid="reader-loading">読込中...</p>
+    </article>
+
+    <footer class="reader-footer">
+      <p class="reader-source">
+        サンプルテキスト (差し替え可能 — `extension/reader/novel.txt` を編集してください)
+      </p>
+    </footer>
+  </main>
+
+  <script src="reader.js"></script>
+</body>
+</html>

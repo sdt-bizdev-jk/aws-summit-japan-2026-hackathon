@@ -1,8 +1,18 @@
 # WaitLess — Architecture
 
-このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-1/` を参照。
+このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-1/` および `aidlc-docs-waitless-archive/cycle-2/` を参照。
 
-最終更新: 2026-05-26 (cycle-1 完了時点)
+最終更新: 2026-05-27 (cycle-3 完了時点)
+
+---
+
+## 0. cycle 別の変更サマリ
+
+| cycle | 主な変更 | 影響範囲 |
+|-------|---------|---------|
+| **cycle-1** | MVP 実装一式 (16 ファイル、Service Worker / Content Scripts / Options Page / 2パス探索 / PlaybackPause) | 全コンポーネント新規 |
+| **cycle-2** | 動画以外の遷移先 (ゲーム / EC / SNS / ストレッチ瞑想) を公式サポート対象に拡大。Options 空状態案内 + manifest `default_title` + README 更新 (version `0.2.0`)。コアロジック・データモデルは非変更 | UI 文言 / README / manifest のみ。`extension/options/{html,css}`, `extension/manifest.json`, `extension/README.md` |
+| **cycle-3** | 拡張機能内蔵の Reader Page (`extension/reader/`) を新規追加。クリックで既読範囲を青色化、スクロール+クリック位置を `chrome.storage.local` の `reader_state` キーに永続化、起動時に復元。`DOMAIN_REGEX` と `validateUrl` の protocol 許可を拡張機能 ID / `chrome-extension:` 対応に拡大 (BR-01/02 改訂)。version `0.3.0`。コアロジック (sw/* 5 つのうち 4 つ + content/* + service_worker.js) は非変更 | 新規 `extension/reader/` 4 ファイル + `manifest.json` (`web_accessible_resources` 追加) + `extension/sw/settings_repository.js` (REGEX/protocol 拡張) + `extension/options/{html,js}` (空状態に読書行追加 + `injectReaderExampleUrl` + `validateUrl/Domain` 拡張) + `extension/README.md` |
 
 ---
 
@@ -85,6 +95,7 @@ WaitLess は、Claude.ai の応答ストリーミングが N秒以上 続いた�
 | PlaybackPause | Content (娯楽タブ動的) | `content/playback_pause.js` | 動画一時停止 (戻り前) |
 | OptionsApp | Options Page | `options/options.js` (前半) | 設定UI とユーザー操作ハンドリング |
 | OptionsAPI | Options Page | `options/options.js` (後半) | sendMessage の Promise ラッパー |
+| ReaderPage (cycle-3) | Reader Page | `reader/{html,css,js,txt}` | 拡張機能内蔵の読書ページ。組み込み小説の表示、クリックでの既読範囲青色化、`chrome.storage.local` 直接アクセスによる `reader_state` の永続化と復元 |
 
 ---
 
@@ -132,8 +143,8 @@ reason コード: `invalid_domain` / `invalid_url` / `duplicate_domain` / `not_f
 ```
 
 バリデーション:
-- domain: 正規表現 `^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`、1〜255 文字
-- url: `new URL(input)` パース成功 + protocol が http/https、1〜2048 文字
+- domain: 正規表現 `^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$|^[a-z]{32}$`、1〜255 文字 (cycle-3 で 32 文字英小数字 = 拡張機能 ID も許可)
+- url: `new URL(input)` パース成功 + protocol が `http:` / `https:` / `chrome-extension:` のいずれか、1〜2048 文字 (cycle-3 で `chrome-extension:` を追加)
 
 ### Settings
 
@@ -153,11 +164,32 @@ reason コード: `invalid_domain` / `invalid_url` / `duplicate_domain` / `not_f
     { "domain": "youtube.com", "url": "https://youtu.be/xxx?autoplay=1", "priority": 1 },
     { "domain": "x.com",       "url": "https://x.com/home",              "priority": 2 }
   ],
-  "threshold_sec": 5
+  "threshold_sec": 5,
+  "reader_state": {
+    "read_offset": 1234,
+    "scroll_y": 5678,
+    "novel_id": "default",
+    "updated_at": 1717113600000
+  }
 }
 ```
 
 `SettingsRepository` がストレージ層 (snake_case) ↔ アプリ層 (camelCase) を境界で変換する。
+`reader_state` は cycle-3 で追加された **ReaderPage 専用キー** で、ReaderApp が直接 `chrome.storage.local` を読み書きする (Service Worker を経由しない)。`sites` / `threshold_sec` の既存スキーマには干渉しない (NFR-07 後方互換性)。
+
+### ReaderStateSnapshot (cycle-3)
+
+```js
+/**
+ * @typedef {Object} ReaderStateSnapshot
+ * @property {number} readOffset  既読範囲の末尾文字オフセット (0 始まり、改行も 1 文字)
+ * @property {number} scrollY     離脱時のスクロール Y 座標 (px、整数)
+ * @property {string} novelId     小説識別キー (cycle-3 では固定値 "default")
+ * @property {number} updatedAt   最終更新時刻 (Date.now())
+ */
+```
+
+バリデーション: `readOffset` / `scrollY` は数値かつ有限、不正値は 0 にフォールバック (BR-37)。クリック時に saveState で即時保存 (BR-34)、離脱時 (`pagehide` / `visibilitychange='hidden'`) に savePartial で scrollY のみ更新。
 
 ### RuntimeState
 
@@ -292,9 +324,23 @@ manifest.json の主要設定:
 
 - ユーザー向けインストール手順: `extension/README.md`
 - バックログ (次にやること): `docs/backlog.md`
-- 次サイクルへの引き継ぎ: `docs/cycle-2-handover.md`
-- 詳細な設計経緯 (cycle-1 archive):
-  - 要件: `aidlc-docs-waitless-archive/cycle-1/inception/requirements/requirements.md`
-  - Application Design: `aidlc-docs-waitless-archive/cycle-1/inception/application-design/application-design.md`
-  - Functional Design: `aidlc-docs-waitless-archive/cycle-1/construction/waitless-extension/functional-design/`
-  - Build & Test 手順: `aidlc-docs-waitless-archive/cycle-1/construction/build-and-test/`
+- 次サイクルへの引き継ぎ: `docs/cycle-4-handover.md`
+- cycle-3 開始時の手引き (履歴): `docs/cycle-3-handover.md`
+- 詳細な設計経緯 (cycle archives):
+  - cycle-1 (MVP):
+    - 要件: `aidlc-docs-waitless-archive/cycle-1/inception/requirements/requirements.md`
+    - Application Design: `aidlc-docs-waitless-archive/cycle-1/inception/application-design/application-design.md`
+    - Functional Design: `aidlc-docs-waitless-archive/cycle-1/construction/waitless-extension/functional-design/`
+    - Build & Test 手順: `aidlc-docs-waitless-archive/cycle-1/construction/build-and-test/`
+  - cycle-2 (遷移先バリエーション拡大):
+    - 要件: `aidlc-docs-waitless-archive/cycle-2/inception/requirements/requirements.md`
+    - 実行計画: `aidlc-docs-waitless-archive/cycle-2/inception/plans/execution-plan.md`
+    - コード変更サマリ: `aidlc-docs-waitless-archive/cycle-2/construction/waitless-extension/code/code-generation-summary.md`
+    - Build & Test サマリ: `aidlc-docs-waitless-archive/cycle-2/construction/build-and-test/build-and-test-summary.md`
+  - cycle-3 (Reader Page 追加):
+    - 要件: `aidlc-docs-waitless-archive/cycle-3/inception/requirements/requirements.md`
+    - 実行計画: `aidlc-docs-waitless-archive/cycle-3/inception/plans/execution-plan.md`
+    - Application Design: `aidlc-docs-waitless-archive/cycle-3/inception/application-design/application-design.md`
+    - Functional Design: `aidlc-docs-waitless-archive/cycle-3/construction/waitless-extension/functional-design/`
+    - コード変更サマリ: `aidlc-docs-waitless-archive/cycle-3/construction/waitless-extension/code/code-generation-summary.md`
+    - Build & Test サマリ: `aidlc-docs-waitless-archive/cycle-3/construction/build-and-test/build-and-test-summary.md`

@@ -14,7 +14,9 @@ const DEFAULT_THRESHOLD_SEC = 5;
 const THRESHOLD_MIN = 1;
 const THRESHOLD_MAX = 60;
 
-const DOMAIN_REGEX = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const DOMAIN_REGEX = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$|^[a-z]{32}$/;
+// cycle-3 (BR-01 改訂): 通常ドメイン (TLD あり) または 32 文字の拡張機能 ID を許可
+// 内蔵ページ (chrome-extension://[ID]/...) を Site 登録できるようにするため
 const DOMAIN_MAX_LEN = 255;
 const URL_MAX_LEN = 2048;
 
@@ -59,7 +61,10 @@ function validateUrl(input) {
   }
   try {
     const u = new URL(trimmed);
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    // cycle-3 (BR-02 改訂): chrome-extension: プロトコルも許可 (内蔵ページ対応)
+    if (u.protocol !== 'http:'
+        && u.protocol !== 'https:'
+        && u.protocol !== 'chrome-extension:') {
       return { ok: false, reason: 'invalid_url' };
     }
     return { ok: true, value: trimmed };

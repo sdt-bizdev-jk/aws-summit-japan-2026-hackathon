@@ -1,8 +1,8 @@
 # WaitLess — Backlog
 
-cycle-1 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
+cycle-1 / cycle-2 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
 
-最終更新: 2026-05-26 (cycle-1 完了時点)
+最終更新: 2026-05-27 (cycle-3 完了時点)
 
 ---
 
@@ -126,8 +126,47 @@ cycle-1 完了時点で抽出された「次にやるかもしれない」項目
 
 ---
 
+## cycle-2 で完了した項目
+
+cycle-2 (2026-05-27 完了) では以下を実装:
+
+- 遷移先バリエーション拡大 (動画 / ゲーム / EC / SNS / ストレッチ瞑想を公式サポート対象に)
+  - Options Page 空状態に 5 種の用途例 + サンプル URL
+  - `manifest.json` の `default_title` 汎用化、`description` 拡張、version `0.2.0`
+  - `extension/README.md` に「対応する遷移先パターン」セクション追加
+- データモデル / コアロジックは非変更 (タイプ概念は導入しない方針)
+- Backlog 項目としては **新規追加 (cycle-3 候補)** 扱いではなく、要望ベースの単発機能として実装
+
+cycle-2 では以下の Backlog 項目は **対応せず継続**:
+- B-01〜B-11 すべて (cycle-2 のスコープから外した)
+
+---
+
+## cycle-3 で完了した項目
+
+cycle-3 (2026-05-27 完了) では以下を実装:
+
+- 拡張機能内蔵の **Reader Page** (`extension/reader/`) を新規追加
+  - `reader.html` / `reader.css` / `reader.js` / `novel.txt` (オリジナルダミー、ユーザー差し替え可能)
+  - クリックでの既読範囲青色化 (双方向、絶対上書き)
+  - `chrome.storage.local` の `reader_state` キーに、スクロール位置 + クリック位置を永続化
+  - 起動時に状態復元 (青色化 → スクロール、`requestAnimationFrame` で次フレーム後)
+- 既存 Site 登録モデルでの統合
+  - `manifest.json` に `web_accessible_resources` 追加 (`reader/*` を `<all_urls>` で公開)、version `0.3.0`
+  - `extension/sw/settings_repository.js` の `DOMAIN_REGEX` を拡張機能 ID 対応に拡張、`validateUrl` の protocol 許可リストに `chrome-extension:` 追加 (BR-01/02 改訂)
+  - `extension/options/options.{html,js}` の空状態案内に「📖 読書 (内蔵)」を追加 + 動的 URL 注入 (`injectReaderExampleUrl`) + `validateUrl/Domain` の二重防御整合
+- 主要ロジック側ファイル (sw/{message_router, wait_orchestrator, tab_manager, runtime_state}, content/*, service_worker.js) は **完全無変更**
+
+cycle-3 では以下の Backlog 項目は **対応せず継続**:
+- B-01〜B-11 すべて (cycle-3 のスコープから外した)
+
+---
+
 ## 関連ドキュメント
 
 - アーキテクチャ: `docs/architecture.md`
-- 次サイクルへの引き継ぎ: `docs/cycle-2-handover.md`
+- 次サイクルへの引き継ぎ: `docs/cycle-4-handover.md`
+- cycle-3 開始時の手引き (履歴): `docs/cycle-3-handover.md`
 - cycle-1 archive: `aidlc-docs-waitless-archive/cycle-1/`
+- cycle-2 archive: `aidlc-docs-waitless-archive/cycle-2/`
+- cycle-3 archive: `aidlc-docs-waitless-archive/cycle-3/`

@@ -1,0 +1,104 @@
+/* WaitLess Reader Page (cycle-3) */
+/* 関連 FR: FR-32 (最小限 UI), NFR-10 (色設計 WCAG AA) */
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #1a1a1a;
+  color: #888;
+}
+
+body {
+  font-family: "Hiragino Mincho Pro", "游明朝", "Yu Mincho", "MS PMincho", serif;
+  font-size: 18px;
+  line-height: 1.85;
+  -webkit-font-smoothing: antialiased;
+}
+
+.reader-container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 64px 24px 128px;
+}
+
+.reader-header {
+  text-align: center;
+  margin-bottom: 48px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #333;
+}
+
+.novel-title {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.novel-author {
+  margin: 0;
+  font-size: 14px;
+  color: #777;
+}
+
+.reader-content {
+  cursor: pointer;
+}
+
+.paragraph {
+  margin: 0 0 1.5em;
+  text-indent: 1em;
+}
+
+/* 既読範囲: 視認性のある青色 (NFR-10 整合) */
+.paragraph .read {
+  color: #3b82f6;
+  transition: color 0.15s ease-out;
+}
+
+.reader-loading {
+  text-align: center;
+  color: #555;
+  font-style: italic;
+}
+
+.reader-error {
+  text-align: center;
+  color: #d97706;
+  padding: 16px;
+  border: 1px dashed #d97706;
+  border-radius: 4px;
+}
+
+.reader-footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid #333;
+  text-align: center;
+}
+
+.reader-source {
+  margin: 0;
+  font-size: 12px;
+  color: #555;
+}
+
+/* レスポンシブ (最小限) */
+@media (max-width: 480px) {
+  .reader-container {
+    padding: 32px 16px 64px;
+  }
+  body {
+    font-size: 16px;
+  }
+  .novel-title {
+    font-size: 22px;
+  }
+  .reader-header {
+    margin-bottom: 32px;
+  }
+}

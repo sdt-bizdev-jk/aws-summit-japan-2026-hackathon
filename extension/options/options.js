@@ -45,7 +45,9 @@
   // ========================================================================
   // バリデーション (BR-01, 02, 04)
   // ========================================================================
-  const DOMAIN_REGEX = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  // cycle-3 (BR-01 改訂): 通常ドメイン または 32 文字英小数字の拡張機能 ID を許可
+  // 内蔵ページ (chrome-extension://[ID]/...) を Site 登録できるようにするため
+  const DOMAIN_REGEX = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$|^[a-z]{32}$/;
 
   function normalizeDomain(s) {
     return (s || '').trim().toLowerCase().replace(/^www\./, '');
@@ -66,8 +68,11 @@
     }
     try {
       const u = new URL(s);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
-        return { ok: false, reason: 'URL は http:// または https:// で始めてください' };
+      // cycle-3: chrome-extension: プロトコルも許可 (内蔵ページ対応、二重防御で SettingsRepository と整合)
+      if (u.protocol !== 'http:'
+          && u.protocol !== 'https:'
+          && u.protocol !== 'chrome-extension:') {
+        return { ok: false, reason: 'URL は http://, https://, または chrome-extension:// で始めてください' };
       }
       return { ok: true, value: s };
     } catch (_e) {
@@ -106,9 +111,30 @@
     editingDomain: null,
 
     async init() {
+      // cycle-3: 空状態案内に表示する読書ページ (内蔵) の動的 URL を注入
+      App.injectReaderExampleUrl();
       this.settings = await OptionsAPI.getSettings();
       this.bindEvents();
       this.render();
+    },
+
+    /**
+     * cycle-3 (FR-37): 空状態案内内の読書ページ用 <code> 要素に
+     * 現在の拡張機能 ID と完全 URL を注入する。
+     */
+    injectReaderExampleUrl() {
+      try {
+        const id = chrome.runtime && chrome.runtime.id ? chrome.runtime.id : '';
+        const url = chrome.runtime && chrome.runtime.getURL
+          ? chrome.runtime.getURL('reader/reader.html')
+          : '';
+        const domainEl = document.querySelector('[data-testid="reader-domain-example"]');
+        const urlEl = document.querySelector('[data-testid="reader-url-example"]');
+        if (domainEl && id) domainEl.textContent = id;
+        if (urlEl && url) urlEl.textContent = url;
+      } catch (_e) {
+        // 失敗は黙って許容 (空状態案内が「読込中...」のまま残る)
+      }
     },
 
     bindEvents() {
