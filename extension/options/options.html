@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WaitLess - 設定</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1 class="title">WaitLess</h1>
+      <p class="subtitle">生成AIの待ち時間を、あなたの娯楽時間に</p>
+    </header>
+
+    <!-- ThresholdSection -->
+    <section class="section" aria-labelledby="threshold-heading">
+      <h2 id="threshold-heading">⚙ しきい値設定</h2>
+      <p class="hint">
+        Claude.aiの応答が
+        <input
+          type="number"
+          id="threshold-input"
+          data-testid="threshold-input"
+          min="1"
+          max="60"
+          step="1"
+          value="5"
+          aria-label="しきい値 (秒)"
+        > 秒以上 続いたら、登録した娯楽サイトに切替します。
+      </p>
+      <p class="range-note">範囲: 1 〜 60 秒 (整数)</p>
+      <button type="button" id="threshold-save" data-testid="threshold-save-button">保存</button>
+      <div class="message" id="threshold-message" aria-live="polite"></div>
+    </section>
+
+    <!-- SitesSection -->
+    <section class="section" aria-labelledby="sites-heading">
+      <h2 id="sites-heading">📋 登録した娯楽サイト</h2>
+
+      <div id="empty-state" class="empty-state" data-testid="empty-state" hidden>
+        <p>まだ登録がありません。</p>
+        <p>最低 1件 登録すると WaitLess が動作します。<br>
+          優先順位の上位から、開いている同ドメインのタブが選ばれます。</p>
+      </div>
+
+      <table id="sites-table" class="sites-table" data-testid="sites-table" hidden>
+        <thead>
+          <tr>
+            <th scope="col">順</th>
+            <th scope="col">ドメイン</th>
+            <th scope="col">URL</th>
+            <th scope="col">操作</th>
+          </tr>
+        </thead>
+        <tbody id="sites-tbody"></tbody>
+      </table>
+    </section>
+
+    <!-- AddSiteForm -->
+    <section class="section" aria-labelledby="add-heading">
+      <h2 id="add-heading">➕ 新規登録</h2>
+      <form id="add-site-form" data-testid="add-site-form" novalidate>
+        <div class="form-row">
+          <label for="add-domain">ドメイン</label>
+          <input
+            type="text"
+            id="add-domain"
+            data-testid="add-domain-input"
+            placeholder="例: youtube.com"
+            autocomplete="off"
+            required
+          >
+        </div>
+        <div class="form-row">
+          <label for="add-url">URL</label>
+          <input
+            type="url"
+            id="add-url"
+            data-testid="add-url-input"
+            placeholder="例: https://youtu.be/xxx?autoplay=1"
+            autocomplete="off"
+            required
+          >
+        </div>
+        <button type="submit" data-testid="add-site-submit-button">追加</button>
+        <div class="message" id="add-site-message" aria-live="polite"></div>
+      </form>
+    </section>
+  </main>
+
+  <script src="options.js"></script>
+</body>
+</html>

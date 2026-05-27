@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "WaitLess",
+  "version": "0.1.0",
+  "description": "生成AIの待ち時間を、登録した娯楽サイトへの自動切替で快適に。Claude.aiの応答を待つ間に動画やSNSを楽しめます。",
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "service_worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content/claude_site_adapter.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "WaitLess (クリックで設定を開く)"
+  },
+  "options_page": "options/options.html",
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  }
+}
