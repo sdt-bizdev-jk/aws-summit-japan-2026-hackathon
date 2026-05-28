@@ -1,8 +1,8 @@
 # WaitLess — Backlog
 
-cycle-1 / cycle-2 / cycle-3 / cycle-4 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
+cycle-1 / cycle-2 / cycle-3 / cycle-4 / cycle-5 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
 
-最終更新: 2026-05-28 (cycle-4 動作確認完了時点)
+最終更新: 2026-05-28 (cycle-5 ポータルページ追加完了時点)
 
 ---
 
@@ -162,6 +162,43 @@ cycle-4 で **新規追加** された Backlog 項目:
 
 ---
 
+## cycle-5 で完了した項目
+
+cycle-5 (2026-05-28 完了) では以下を実装:
+
+### 新規 Unit
+- **Unit 1: portal-page** (新規、Chrome 拡張内蔵の娯楽ポータルページ)
+  - `extension/portal/portal.html` (28 行) — DOM 骨格
+  - `extension/portal/portal.css` (230 行) — ダーク基調 (#0a0a0f) + 紫アクセント (#7c3aed) の Netflix 風レイアウト
+  - `extension/portal/portal.js` (170 行) — PORTAL_DATA からカード/ジャンル行を動的レンダリング、URL バリデーション、Reader URL の動的解決
+  - `extension/portal/portal_data.js` (175 行) — `window.PORTAL_DATA` 静的データ (12 ジャンル × 6 カード = 72 サイト)
+
+### 新規機能
+- Netflix 風カードグリッド (12 ジャンル × 6 カード = 72 サイト)
+  - 動画視聴 / 音楽 / EC / ゲーム / SNS / ニュース / 読書 / 漫画 / スポーツ / 料理 / 旅行 / リラックス
+- 横スクロール (`scroll-snap-type: x mandatory`) + ホバー拡大 + キーボード操作可
+- Options Page 空状態案内に「🎬 娯楽ポータル (内蔵)」を追加 + ワンクリック登録ボタン (`injectPortalExampleUrl`)
+- カードクリックは `<a href>` のデフォルト挙動 = 同タブ遷移
+
+### NFR-54 (cycle-1〜4 後方互換性) の実証
+- `extension/sw/*` 6 ファイル + `extension/content/*` 3 ファイル + `extension/reader/*` 4 ファイル + `extension/service_worker.js` + `vscode-extension/*` 一式は **完全無変更** (`git status` で実証)
+- 既存 `extension/manifest.json` への変更は最小: `web_accessible_resources.resources` に portal/* 4 件追加 + version `0.4.0` → `0.5.0` + description 追記
+- 既存 `extension/options/*` への変更は空状態案内 1 項目 + 関数 1 つ + CSS 1 ブロック追加のみ
+
+cycle-5 では以下の Backlog 項目は **対応せず継続**:
+- B-01〜B-13、B-15〜B-19、B-20 すべて (cycle-5 のスコープから外した)
+
+cycle-5 で **新規追加** された Backlog 項目:
+- **B-21** [Low] [Feature] ポータルページのカード画像対応 (現状は絵文字のみ、サムネイル画像を `extension/portal/assets/` 配下に置きたくなったら検討)
+- **B-22** [Low] [Feature] ポータルページのお気に入り / 履歴機能 (`chrome.storage.local` の `portal_state` キーを追加、`reader_state` と同じパターン)
+- **B-23** [Low] [Feature] ポータルページのジャンルフィルタ / 検索機能 (カード数が 100 を超えたら必要になる)
+- **B-24** [Low] [Feature] ユーザー UI からのカード追加・編集 (現状は `portal_data.js` 直接編集)
+- **B-25** [Low] [Tech debt] ポータルページのリンク切れ検知 (カードクリック時の遷移失敗を捕捉、または定期チェック)
+- **B-26** [Low] [Feature] モバイル幅 (< 768px) 対応 (現状は 768〜1280px のみ保証)
+- **B-27** [Low] [Tech debt] ポータルページのデバッグログ OFF (`extension/portal/portal.js` の `const DEBUG = true;`、B-02 / B-12 と同類)
+
+---
+
 ## Backlog 運用ルール
 
 - 新しい項目は末尾に追加し、ID (B-NN) を採番
@@ -210,10 +247,12 @@ cycle-3 では以下の Backlog 項目は **対応せず継続**:
 ## 関連ドキュメント
 
 - アーキテクチャ: `docs/architecture.md`
-- 次サイクルへの引き継ぎ: `docs/cycle-5-handover.md`
+- 次サイクルへの引き継ぎ: `docs/cycle-6-handover.md`
 - cycle-3 開始時の手引き (履歴): `docs/cycle-3-handover.md`
 - cycle-4 開始時の手引き (履歴): `docs/cycle-4-handover.md`
+- cycle-5 開始時の手引き (履歴): `docs/cycle-5-handover.md`
 - cycle-1 archive: `aidlc-docs-waitless-archive/cycle-1/`
 - cycle-2 archive: `aidlc-docs-waitless-archive/cycle-2/`
 - cycle-3 archive: `aidlc-docs-waitless-archive/cycle-3/`
 - cycle-4 archive: `aidlc-docs-waitless-archive/cycle-4/`
+- cycle-5 archive: `aidlc-docs-waitless-archive/cycle-5/`

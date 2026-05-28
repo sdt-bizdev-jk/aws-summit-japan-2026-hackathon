@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WaitLess Portal — 娯楽ポータル</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <h1 class="hero-title">WaitLess <span class="hero-title-accent">Portal</span></h1>
+      <p class="hero-subtitle">AI 待ちの時間、好きなものを 1 クリックで。</p>
+    </div>
+  </header>
+
+  <main id="genre-container" class="genre-container">
+    <!-- portal.js が動的に .genre-row を生成 -->
+    <div class="loading" id="loading-message">読み込み中...</div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <strong>WaitLess</strong> Chrome Extension v0.5.0 ・
+      データは外部送信されません ・
+      ローカル完結
+    </p>
+  </footer>
+
+  <script src="portal_data.js"></script>
+  <script src="portal.js"></script>
+</body>
+</html>

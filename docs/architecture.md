@@ -1,8 +1,8 @@
 # WaitLess — Architecture
 
-このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3 + cycle-4 から VS Code (Kiro) 拡張機能) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-{1,2,3,4}/` を参照。
+このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3 + cycle-4 から VS Code (Kiro) 拡張機能) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-{1,2,3,4,5}/` を参照。
 
-最終更新: 2026-05-28 (cycle-4 動作確認完了時点)
+最終更新: 2026-05-28 (cycle-5 ポータルページ追加完了時点)
 
 ---
 
@@ -14,6 +14,7 @@
 | **cycle-2** | 動画以外の遷移先 (ゲーム / EC / SNS / ストレッチ瞑想) を公式サポート対象に拡大。Options 空状態案内 + manifest `default_title` + README 更新 (version `0.2.0`)。コアロジック・データモデルは非変更 | UI 文言 / README / manifest のみ |
 | **cycle-3** | 拡張機能内蔵の Reader Page (`extension/reader/`) を新規追加。クリックで既読範囲を青色化、スクロール+クリック位置を `chrome.storage.local` の `reader_state` キーに永続化、起動時に復元。`DOMAIN_REGEX` と `validateUrl` の protocol 許可を拡張機能 ID / `chrome-extension:` 対応に拡大 (BR-01/02 改訂)。version `0.3.0`。コアロジック (sw/* 5 つのうち 4 つ + content/* + service_worker.js) は非変更 | 新規 `extension/reader/` 4 ファイル + `manifest.json` (`web_accessible_resources` 追加) + `extension/sw/settings_repository.js` + `extension/options/{html,js}` + `extension/README.md` |
 | **cycle-4** | **新規 VS Code (Kiro) 拡張機能 `vscode-extension/`** (TypeScript ~530 行、9 論理コンポーネント) を追加。**ローカル WebSocket IPC** (`ws://127.0.0.1:39472`) で Chrome 拡張と双方向通信し、Kiro Agent Hooks (promptSubmit / agentStop) からの呼び出しで外部ブラウザ起動 + osascript による Kiro 最前面化を実現。既存 Chrome 拡張に **`sw/ide_bridge.js`** を追加 + Options Page に IPC ON/OFF トグルを追加 (version `0.4.0`)。既存 sw/* 4 ファイル + content/* + reader/* は **完全無変更** (NFR-27 厳守)。**2026-05-28 動作確認完了**: Hook ブリッジ方式 (`/tmp/waitless-ide-triggers/` 監視) で Kiro Hook → 拡張機能 → Chrome 連動を実現、`tab_manager.js` にウィンドウフォーカス処理追加 + `BrowserLauncher.activateBrowserApp()` で Chrome アプリ自体の前面化を実装 | 新規 `vscode-extension/` 配下一式 (TypeScript / Hook テンプレート JSON 2 バリアント) + 改修 `extension/{service_worker,manifest,options/*,README}.js` + 新規 `extension/sw/ide_bridge.js` + `extension/sw/tab_manager.js` (Pass 1〜3 全てで `chrome.windows.update({ focused: true })` 追加) |
+| **cycle-5** | **拡張機能内蔵の娯楽ポータルページ (`extension/portal/`)** を新規追加 (4 ファイル ≈ 600 行)。Netflix 風カードグリッドで **12 ジャンル × 6 カード = 72 サイト** へ 1 クリックで遷移。ダーク基調 (#0a0a0f) + 紫アクセント (#7c3aed) の独自テーマ。横スクロール + scroll-snap + ホバー拡大。画像不使用 (絵文字 + CSS グラデのみ、依存ゼロ)。`manifest.json` の `web_accessible_resources` に portal/* 4 件を追加、version `0.4.0` → `0.5.0`。Options Page 空状態案内に「🎬 娯楽ポータル (内蔵)」を 1 行追加 + ワンクリック登録ボタン (`injectPortalExampleUrl`)。**既存 sw/* + content/* + reader/* + service_worker.js + vscode-extension/* は完全無変更** (cycle-3 と同じ NFR-54 方針) | 新規 `extension/portal/{portal.html, portal.css, portal.js, portal_data.js}` + 改修 `extension/manifest.json` + `extension/options/{options.html, options.js, options.css}` + `extension/README.md` |
 
 ---
 
@@ -114,6 +115,7 @@ cycle-1〜3 の Claude.ai → Chrome 拡張のフローは無変更で継続。c
 | OptionsApp | Options Page | `options/options.js` (前半) | 設定UI とユーザー操作ハンドリング |
 | OptionsAPI | Options Page | `options/options.js` (後半) | sendMessage の Promise ラッパー |
 | ReaderPage (cycle-3) | Reader Page | `reader/{html,css,js,txt}` | 拡張機能内蔵の読書ページ。組み込み小説の表示、クリックでの既読範囲青色化、`chrome.storage.local` 直接アクセスによる `reader_state` の永続化と復元 |
+| PortalPage (cycle-5) | Portal Page | `portal/{portal.html, portal.css, portal.js, portal_data.js}` | 拡張機能内蔵の娯楽ポータルページ。Netflix 風 12 ジャンル × 6 カード = 72 サイトをカードグリッドで表示、`<a href>` ベースで同タブ遷移。`window.PORTAL_DATA` 静的データから DOM を動的レンダリング |
 
 ---
 
@@ -240,6 +242,16 @@ extension/
 │   ├── claude_site_adapter.js # 静的注入 (claude.ai/*)
 │   ├── playback_trigger.js    # 動的注入 (娯楽タブ、再生試行 + リトライ)
 │   └── playback_pause.js      # 動的注入 (娯楽タブ、戻る前に一時停止)
+├── portal/                    # ★ cycle-5 新規 (娯楽ポータルページ)
+│   ├── portal.html            # ヘッダ + main + フッタの骨格
+│   ├── portal.css             # ダーク基調 + 紫アクセント (Netflix 風)
+│   ├── portal.js              # PORTAL_DATA からカード/ジャンル行を生成
+│   └── portal_data.js         # 12 ジャンル × 6 カード = 72 サイトの静的データ
+├── reader/                    # cycle-3 追加
+│   ├── reader.html
+│   ├── reader.css
+│   ├── reader.js
+│   └── novel.txt
 ├── options/
 │   ├── options.html           # OptionsApp の DOM
 │   ├── options.css            # スタイル

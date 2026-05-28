@@ -113,6 +113,8 @@
     async init() {
       // cycle-3: 空状態案内に表示する読書ページ (内蔵) の動的 URL を注入
       App.injectReaderExampleUrl();
+      // cycle-5: 空状態案内に表示する娯楽ポータル (内蔵) の動的 URL を注入 + 登録ボタン
+      App.injectPortalExampleUrl();
       // cycle-4: IPC ON/OFF トグルの初期化
       App.initIpcToggle();
       this.settings = await OptionsAPI.getSettings();
@@ -136,6 +138,43 @@
         if (urlEl && url) urlEl.textContent = url;
       } catch (_e) {
         // 失敗は黙って許容 (空状態案内が「読込中...」のまま残る)
+      }
+    },
+
+    /**
+     * cycle-5 (FR-57): 空状態案内内の娯楽ポータル用 <code> 要素に
+     * 現在の拡張機能 ID と完全 URL を注入する。
+     * 同時に「このポータルを登録する」ボタンを表示し、クリックで sites に追加する。
+     */
+    injectPortalExampleUrl() {
+      try {
+        const id = chrome.runtime && chrome.runtime.id ? chrome.runtime.id : '';
+        const url = chrome.runtime && chrome.runtime.getURL
+          ? chrome.runtime.getURL('portal/portal.html')
+          : '';
+        const domainEl = document.querySelector('[data-testid="portal-domain-example"]');
+        const urlEl    = document.querySelector('[data-testid="portal-url-example"]');
+        const btn      = document.querySelector('[data-testid="portal-add-button"]');
+
+        if (domainEl && id) domainEl.textContent = id;
+        if (urlEl && url)   urlEl.textContent = url;
+
+        if (btn && id && url) {
+          btn.hidden = false;
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            const r = await OptionsAPI.addSite({ domain: id, url });
+            if (r && r.ok) {
+              await App.refresh();
+              // 空状態は非表示になるが、再表示時のために disabled は維持
+            } else {
+              btn.disabled = false;
+              alert(`登録に失敗: ${reasonToMessage(r && r.reason)}`);
+            }
+          });
+        }
+      } catch (_e) {
+        // 失敗は黙って許容
       }
     },
 

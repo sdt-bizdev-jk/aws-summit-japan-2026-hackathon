@@ -291,6 +291,30 @@ button.icon {
   text-align: center;
 }
 
+/* Portal: ワンクリック登録ボタン (cycle-5) */
+.example-add-button {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.example-add-button:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.example-add-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* IPC Toggle (cycle-4) */
 
 .ipc-toggle-label {

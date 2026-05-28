@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "WaitLess",
-  "version": "0.4.0",
-  "description": "生成AIの待ち時間を、登録した娯楽サイトへの自動切替で快適に。Claude.aiの応答待ちに加え、cycle-4 で Kiro IDE と連携して、IDE での AI 待ち時間にも動画・ゲーム・SNS・EC・ストレッチ瞑想・読書 (内蔵) などを楽しめます。",
+  "version": "0.5.0",
+  "description": "生成AIの待ち時間を、登録した娯楽サイトへの自動切替で快適に。Claude.aiの応答待ちに加え、Kiro IDE と連携して、IDE での AI 待ち時間にも動画・ゲーム・SNS・EC・ストレッチ瞑想・読書 (内蔵)・娯楽ポータル (内蔵) などを楽しめます。",
   "permissions": [
     "storage",
     "tabs",
@@ -33,7 +33,11 @@
         "reader/reader.html",
         "reader/reader.css",
         "reader/reader.js",
-        "reader/novel.txt"
+        "reader/novel.txt",
+        "portal/portal.html",
+        "portal/portal.css",
+        "portal/portal.js",
+        "portal/portal_data.js"
       ],
       "matches": ["<all_urls>"]
     }
