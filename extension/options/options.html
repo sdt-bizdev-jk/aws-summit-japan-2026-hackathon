@@ -143,6 +143,28 @@
         <div class="message" id="add-site-message" aria-live="polite"></div>
       </form>
     </section>
+
+    <!-- IpcToggleSection (cycle-4) -->
+    <section class="section" aria-labelledby="ipc-heading">
+      <h2 id="ipc-heading">🔌 IDE 連携 (cycle-4 実験的)</h2>
+      <p class="hint">
+        Kiro IDE 用の WaitLess IDE 拡張機能と連動して、
+        AI 待ち時間中に動画タブで自動再生 / 完了時に一時停止します。
+      </p>
+      <label class="ipc-toggle-label">
+        <input
+          type="checkbox"
+          id="ipc-toggle"
+          data-testid="options-ipc-toggle"
+          checked
+        >
+        Kiro IDE 連携を有効にする
+      </label>
+      <p class="range-note">
+        接続先: <code>ws://127.0.0.1:39472</code><br>
+        Kiro 側で WaitLess IDE 拡張機能が起動している時のみ接続されます。
+      </p>
+    </section>
   </main>
 
   <script src="options.js"></script>

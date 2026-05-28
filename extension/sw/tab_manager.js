@@ -63,6 +63,15 @@ export async function findOrOpenPlaySite(sites) {
     for (const tab of tabs) {
       if (tab.url && tab.url === site.url) {
         dlog('hit existing tab (url match)', { tabId: tab.id, domain: site.domain });
+        // タブをアクティブ化しウィンドウもフォーカス (Chrome を前面に出す)
+        try {
+          await chrome.tabs.update(tab.id, { active: true });
+          if (currentWindow.id != null) {
+            await chrome.windows.update(currentWindow.id, { focused: true });
+          }
+        } catch (e) {
+          console.warn('[WaitLess][TabManager] activate on hit failed', e);
+        }
         return { tabId: tab.id, opened: 'existing' };
       }
     }
@@ -76,6 +85,9 @@ export async function findOrOpenPlaySite(sites) {
           { tabId: tab.id, domain: site.domain, from: tab.url, to: site.url });
         try {
           await chrome.tabs.update(tab.id, { url: site.url, active: true });
+          if (currentWindow.id != null) {
+            await chrome.windows.update(currentWindow.id, { focused: true });
+          }
         } catch (e) {
           console.warn('[WaitLess][TabManager] tabs.update navigate failed', e);
         }
@@ -93,6 +105,13 @@ export async function findOrOpenPlaySite(sites) {
       active: true,
       windowId: currentWindow.id,
     });
+    if (currentWindow.id != null) {
+      try {
+        await chrome.windows.update(currentWindow.id, { focused: true });
+      } catch (e) {
+        console.warn('[WaitLess][TabManager] windows.update focus failed', e);
+      }
+    }
     return { tabId: newTab.id, opened: 'new' };
   } catch (e) {
     console.error('[WaitLess][TabManager] tabs.create failed', e);

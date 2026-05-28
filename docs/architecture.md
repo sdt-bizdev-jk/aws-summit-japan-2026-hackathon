@@ -1,8 +1,8 @@
 # WaitLess — Architecture
 
-このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-1/` および `aidlc-docs-waitless-archive/cycle-2/` を参照。
+このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3 + cycle-4 から VS Code (Kiro) 拡張機能) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-{1,2,3,4}/` を参照。
 
-最終更新: 2026-05-27 (cycle-3 完了時点)
+最終更新: 2026-05-28 (cycle-4 動作確認完了時点)
 
 ---
 
@@ -11,59 +11,77 @@
 | cycle | 主な変更 | 影響範囲 |
 |-------|---------|---------|
 | **cycle-1** | MVP 実装一式 (16 ファイル、Service Worker / Content Scripts / Options Page / 2パス探索 / PlaybackPause) | 全コンポーネント新規 |
-| **cycle-2** | 動画以外の遷移先 (ゲーム / EC / SNS / ストレッチ瞑想) を公式サポート対象に拡大。Options 空状態案内 + manifest `default_title` + README 更新 (version `0.2.0`)。コアロジック・データモデルは非変更 | UI 文言 / README / manifest のみ。`extension/options/{html,css}`, `extension/manifest.json`, `extension/README.md` |
-| **cycle-3** | 拡張機能内蔵の Reader Page (`extension/reader/`) を新規追加。クリックで既読範囲を青色化、スクロール+クリック位置を `chrome.storage.local` の `reader_state` キーに永続化、起動時に復元。`DOMAIN_REGEX` と `validateUrl` の protocol 許可を拡張機能 ID / `chrome-extension:` 対応に拡大 (BR-01/02 改訂)。version `0.3.0`。コアロジック (sw/* 5 つのうち 4 つ + content/* + service_worker.js) は非変更 | 新規 `extension/reader/` 4 ファイル + `manifest.json` (`web_accessible_resources` 追加) + `extension/sw/settings_repository.js` (REGEX/protocol 拡張) + `extension/options/{html,js}` (空状態に読書行追加 + `injectReaderExampleUrl` + `validateUrl/Domain` 拡張) + `extension/README.md` |
+| **cycle-2** | 動画以外の遷移先 (ゲーム / EC / SNS / ストレッチ瞑想) を公式サポート対象に拡大。Options 空状態案内 + manifest `default_title` + README 更新 (version `0.2.0`)。コアロジック・データモデルは非変更 | UI 文言 / README / manifest のみ |
+| **cycle-3** | 拡張機能内蔵の Reader Page (`extension/reader/`) を新規追加。クリックで既読範囲を青色化、スクロール+クリック位置を `chrome.storage.local` の `reader_state` キーに永続化、起動時に復元。`DOMAIN_REGEX` と `validateUrl` の protocol 許可を拡張機能 ID / `chrome-extension:` 対応に拡大 (BR-01/02 改訂)。version `0.3.0`。コアロジック (sw/* 5 つのうち 4 つ + content/* + service_worker.js) は非変更 | 新規 `extension/reader/` 4 ファイル + `manifest.json` (`web_accessible_resources` 追加) + `extension/sw/settings_repository.js` + `extension/options/{html,js}` + `extension/README.md` |
+| **cycle-4** | **新規 VS Code (Kiro) 拡張機能 `vscode-extension/`** (TypeScript ~530 行、9 論理コンポーネント) を追加。**ローカル WebSocket IPC** (`ws://127.0.0.1:39472`) で Chrome 拡張と双方向通信し、Kiro Agent Hooks (promptSubmit / agentStop) からの呼び出しで外部ブラウザ起動 + osascript による Kiro 最前面化を実現。既存 Chrome 拡張に **`sw/ide_bridge.js`** を追加 + Options Page に IPC ON/OFF トグルを追加 (version `0.4.0`)。既存 sw/* 4 ファイル + content/* + reader/* は **完全無変更** (NFR-27 厳守)。**2026-05-28 動作確認完了**: Hook ブリッジ方式 (`/tmp/waitless-ide-triggers/` 監視) で Kiro Hook → 拡張機能 → Chrome 連動を実現、`tab_manager.js` にウィンドウフォーカス処理追加 + `BrowserLauncher.activateBrowserApp()` で Chrome アプリ自体の前面化を実装 | 新規 `vscode-extension/` 配下一式 (TypeScript / Hook テンプレート JSON 2 バリアント) + 改修 `extension/{service_worker,manifest,options/*,README}.js` + 新規 `extension/sw/ide_bridge.js` + `extension/sw/tab_manager.js` (Pass 1〜3 全てで `chrome.windows.update({ focused: true })` 追加) |
 
 ---
 
 ## 1. Overview
 
-WaitLess は、Claude.ai の応答ストリーミングが N秒以上 続いた瞬間に、ユーザーが事前登録した娯楽サイトのタブへ自動切替し、出力完了で即時 Claude.ai タブへ戻る Chrome 拡張機能 (Manifest V3) である。
+WaitLess は、生成 AI の応答ストリーミング待ち時間に、ユーザーが事前登録した娯楽サイトのタブへ自動切替する仕組み。**2 つの拡張機能** で構成される:
 
-すべてのデータは端末ローカル (`chrome.storage.local`) に閉じる。外部サーバー / 外部 API への送信は行わない。素の JavaScript / HTML / CSS のみで実装され、ビルド不要。
+- **Chrome 拡張 (`extension/`)**: cycle-1〜3 で構築。Claude.ai の DOM 監視で待ち時間を検知 → 娯楽タブ自動切替 → 出力完了で Claude.ai タブに戻る
+- **VS Code (Kiro) 拡張 (`vscode-extension/`)**: cycle-4 で新規追加。Kiro Agent Hooks (promptSubmit / agentStop) を起点に、外部ブラウザ起動 + osascript による Kiro 最前面化
+
+両者は **ローカル WebSocket** (`ws://127.0.0.1:39472`、外部公開なし) で双方向通信し、Chrome 拡張のサイトリスト共有 + 動画一時停止指示などをやり取りする。両者は独立しても動作する (フォールバックパスあり、NFR-28)。
+
+すべてのデータは端末ローカル (`chrome.storage.local` / VS Code `settings.json`) に閉じる。外部サーバー / 外部 API への送信は行わない。
 
 ---
 
 ## 2. アーキテクチャ全体像
 
-3層 (Service Worker / Content Script / Options Page) + 1ストア (`chrome.storage`) の構成。
+cycle-4 完了時点の構成:
 
 ```
 +------------------------------------------------------------------+
-|                          Chrome Browser                          |
+|  Kiro IDE (cycle-4)                  Chrome Browser              |
+|                                                                  |
+|  [Agent Hooks]                       [Options Page]              |
+|   .kiro/hooks/*.json                  options.html / .js / .css  |
+|   ├ 01-on-prompt-submit.json          └ + IPC ON/OFF トグル       |
+|   └ 02-on-agent-stop.json                                        |
+|        |                                                          |
+|        | runCommand                                              |
+|        v                                                          |
+|  [VS Code Extension Host]            [Chrome Service Worker]     |
+|   vscode-extension/src/extension.ts   service_worker.js + sw/*   |
+|   ┌──────────────────────────┐        ┌─────────────────────────┐|
+|   │ ExtensionLifecycle       │        │ MessageRouter           │|
+|   │ CommandRegistry          │        │ WaitOrchestrator        │|
+|   │ WaitOrchestratorIde      │        │ TabManager              │|
+|   │ SettingsReader           │        │ SettingsRepository      │|
+|   │ UrlListMerger            │        │ RuntimeState            │|
+|   │ UrlSelector              │  ←     │ ★ IdeBridge (cycle-4)   │|
+|   │ BrowserLauncher          │   IPC  │                         │|
+|   │ WindowActivator          │  →     │                         │|
+|   │ IpcClient (WS Server)    │        │                         │|
+|   └──────────────────────────┘        └─────────────────────────┘|
+|        ↓ vscode.env.openExternal       ↑                          |
+|        ↓ child_process (osascript)     ↑                          |
+|                                                                   |
+|  [Settings: VS Code settings.json]   [Storage: chrome.storage]   |
+|   aiWaitLessMode.urls                 sites / threshold_sec      |
+|   aiWaitLessMode.enabled              reader_state               |
+|                                       ipc_enabled (cycle-4)      |
+|                                                                   |
+|  [Content Scripts (Chrome 拡張、cycle-1〜3)]                     |
+|   content/claude_site_adapter.js (Claude.ai)                     |
+|   content/playback_trigger.js  (娯楽タブ動的注入)                  |
+|   content/playback_pause.js    (娯楽タブ動的注入)                  |
+|                                                                   |
+|  [Reader Page (Chrome 拡張内蔵、cycle-3)]                         |
+|   reader/{html,css,js,txt}                                       |
 +------------------------------------------------------------------+
-|                                                                  |
-|  [Options Page]                                                  |
-|   options.html / options.js / options.css                        |
-|   ├ OptionsApp (UI 制御 / インライン編集 / バリデーション)        |
-|   └ OptionsAPI ──────── sendMessage ──────────┐                  |
-|                                                v                 |
-|  [Service Worker]                                                |
-|   service_worker.js + sw/*.js                                    |
-|   ┌────────────────────────────────────────────────────┐         |
-|   │ MessageRouter (sendMessage 受信ハブ)                │         |
-|   │  ├─ WaitOrchestrator (中心)                         │         |
-|   │  │   ├─ TabManager  ─── chrome.tabs.* / scripting   │         |
-|   │  │   ├─ SettingsRepository ── chrome.storage.local  │         |
-|   │  │   └─ RuntimeState ─────── chrome.storage.session │         |
-|   └────────────────────────────────────────────────────┘         |
-|        ^                                                         |
-|        | sendMessage (WAIT_DETECTED / COMPLETION_DETECTED)       |
-|        |                                                         |
-|  [Content Script: Claude.ai タブ]                                |
-|   content/claude_site_adapter.js                                 |
-|   └ ClaudeSiteAdapter ── 停止ボタン MutationObserver で監視       |
-|                                                                  |
-|  [Content Script: 娯楽タブ (動的注入)]                           |
-|   content/playback_trigger.js  -- 待ち発生時に動画再生試行         |
-|   content/playback_pause.js    -- 完了時に動画一時停止            |
-|                                                                  |
-|  [chrome.storage.local]                                          |
-|   { sites: [{domain, url, priority}, ...], threshold_sec: 5 }    |
-|  [chrome.storage.session]                                        |
-|   { runtime_state: { isWaiting, claudeTabId, playTabId } }       |
-+------------------------------------------------------------------+
+
+         ←—————————————————————————————————————→
+         WebSocket (ws://127.0.0.1:39472、cycle-4 で追加)
+         JSON メッセージ: GET_SITES / FIND_OR_OPEN_TAB /
+                         PAUSE_MEDIA / PING / PONG (双方向)
 ```
+
+cycle-1〜3 の Claude.ai → Chrome 拡張のフローは無変更で継続。cycle-4 の Kiro → VS Code 拡張 → IPC → Chrome 拡張のフローが追加された形。
 
 ---
 
@@ -344,3 +362,11 @@ manifest.json の主要設定:
     - Functional Design: `aidlc-docs-waitless-archive/cycle-3/construction/waitless-extension/functional-design/`
     - コード変更サマリ: `aidlc-docs-waitless-archive/cycle-3/construction/waitless-extension/code/code-generation-summary.md`
     - Build & Test サマリ: `aidlc-docs-waitless-archive/cycle-3/construction/build-and-test/build-and-test-summary.md`
+  - cycle-4 (Kiro 拡張機能 + IPC 連携):
+    - 要件: `aidlc-docs-waitless-archive/cycle-4/inception/requirements/requirements.md`
+    - 実行計画: `aidlc-docs-waitless-archive/cycle-4/inception/plans/execution-plan.md`
+    - Application Design: `aidlc-docs-waitless-archive/cycle-4/inception/application-design/application-design.md`
+    - Functional Design (Unit 1): `aidlc-docs-waitless-archive/cycle-4/construction/vscode-extension/functional-design/`
+    - Functional Design (Unit 2): `aidlc-docs-waitless-archive/cycle-4/construction/chrome-extension-bridge/functional-design/`
+    - Build & Test サマリ: `aidlc-docs-waitless-archive/cycle-4/construction/build-and-test/build-and-test-summary.md`
+    - 監査ログ: `aidlc-docs-waitless-archive/cycle-4/audit.md`

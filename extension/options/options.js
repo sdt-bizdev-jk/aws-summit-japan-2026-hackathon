@@ -113,6 +113,8 @@
     async init() {
       // cycle-3: 空状態案内に表示する読書ページ (内蔵) の動的 URL を注入
       App.injectReaderExampleUrl();
+      // cycle-4: IPC ON/OFF トグルの初期化
+      App.initIpcToggle();
       this.settings = await OptionsAPI.getSettings();
       this.bindEvents();
       this.render();
@@ -135,6 +137,34 @@
       } catch (_e) {
         // 失敗は黙って許容 (空状態案内が「読込中...」のまま残る)
       }
+    },
+
+    /**
+     * cycle-4 (FR-61): IPC ON/OFF トグルの初期化と change イベントハンドラ。
+     * chrome.storage.local.ipc_enabled の get/set を担当。
+     * トグル変更時に IdeBridge が storage.onChanged 経由で反応する。
+     * デフォルト値は true (ipc_enabled キー未設定時、Q2=A 確定)。
+     */
+    initIpcToggle() {
+      const toggle = document.getElementById('ipc-toggle');
+      if (!toggle) return;
+
+      // 初期値を反映
+      chrome.storage.local.get('ipc_enabled', (stored) => {
+        const _ = chrome.runtime.lastError;
+        // デフォルト true (false が明示的にセットされている場合のみ false)
+        toggle.checked = stored && stored.ipc_enabled !== false;
+      });
+
+      // change イベント
+      toggle.addEventListener('change', () => {
+        const next = toggle.checked;
+        chrome.storage.local.set({ ipc_enabled: next }, () => {
+          const _ = chrome.runtime.lastError;
+          // Service Worker 側 IdeBridge が storage.onChanged を購読しているので、
+          // ここでは保存するだけで、init() / shutdown() は自動的に呼ばれる。
+        });
+      });
     },
 
     bindEvents() {

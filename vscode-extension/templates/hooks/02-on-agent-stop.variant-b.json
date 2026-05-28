@@ -1,0 +1,12 @@
+{
+  "name": "WaitLess: AI 完了で Kiro に戻る (Variant B: CLI 経由)",
+  "version": "1.0.0",
+  "description": "AI 応答完了 / 入力要求時に VS Code CLI 経由で WaitLess IDE 拡張機能の endWaiting コマンドを呼び出す (cycle-4、Variant A が動作しない環境向け)",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "code --command waitless.endWaiting"
+  }
+}

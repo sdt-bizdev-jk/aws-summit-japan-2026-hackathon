@@ -1,0 +1,12 @@
+{
+  "name": "WaitLess: AI 待ち開始 (Variant B: CLI 経由)",
+  "version": "1.0.0",
+  "description": "プロンプト送信時に VS Code CLI 経由で WaitLess IDE 拡張機能の startWaiting コマンドを呼び出す (cycle-4、Variant A が動作しない環境向け)",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "code --command waitless.startWaiting"
+  }
+}

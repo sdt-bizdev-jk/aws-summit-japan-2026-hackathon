@@ -1,0 +1,12 @@
+{
+  "name": "WaitLess: AI 待ち開始 (Variant A: 直接コマンド)",
+  "version": "1.0.0",
+  "description": "プロンプト送信時に WaitLess IDE 拡張機能の startWaiting コマンドを直接呼び出し、外部ブラウザで娯楽サイトを開く (cycle-4)",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "waitless.startWaiting"
+  }
+}

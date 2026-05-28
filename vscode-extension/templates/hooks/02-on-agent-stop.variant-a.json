@@ -1,0 +1,12 @@
+{
+  "name": "WaitLess: AI 完了で Kiro に戻る (Variant A: 直接コマンド)",
+  "version": "1.0.0",
+  "description": "AI 応答完了 / 入力要求時に WaitLess IDE 拡張機能の endWaiting コマンドを直接呼び出し、Kiro ウィンドウを最前面化する (cycle-4)",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "waitless.endWaiting"
+  }
+}

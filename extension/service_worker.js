@@ -12,6 +12,7 @@
 
 import * as RuntimeState from './sw/runtime_state.js';
 import * as MessageRouter from './sw/message_router.js';
+import * as IdeBridge from './sw/ide_bridge.js';
 
 // 起動時の同期初期化
 MessageRouter.init();
@@ -19,6 +20,11 @@ MessageRouter.init();
 // 非同期で session 状態を復元 (BR-16)
 RuntimeState.restoreFromSession().catch((e) => {
   console.warn('[WaitLess] restoreFromSession failed', e);
+});
+
+// cycle-4: IDE Bridge (VS Code 拡張との WebSocket 連携) を初期化
+IdeBridge.init().catch((e) => {
+  console.warn('[WaitLess] IdeBridge init failed', e);
 });
 
 // ツールバーアイコンクリック → オプションページを開く (Q8=A)

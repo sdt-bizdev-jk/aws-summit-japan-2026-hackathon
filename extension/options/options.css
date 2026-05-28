@@ -290,3 +290,21 @@ button.icon {
   color: #888;
   text-align: center;
 }
+
+/* IPC Toggle (cycle-4) */
+
+.ipc-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  margin: 4px 0 8px;
+}
+
+.ipc-toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #1976d2;
+}

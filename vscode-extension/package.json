@@ -1,0 +1,64 @@
+{
+  "name": "waitless-ide",
+  "displayName": "WaitLess IDE — AI 待ち時間の有効活用",
+  "description": "Kiro IDE で AI 応答待ち中に外部ブラウザを開き、完了で自動的に Kiro に戻す。Agent Hooks (promptSubmit / agentStop) と連動。",
+  "version": "0.1.0",
+  "publisher": "waitless",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "waitless.startWaiting",
+        "title": "WaitLess: AI 待ち開始",
+        "category": "WaitLess"
+      },
+      {
+        "command": "waitless.endWaiting",
+        "title": "WaitLess: AI 完了で Kiro に戻る",
+        "category": "WaitLess"
+      }
+    ],
+    "configuration": {
+      "title": "AI WaitLess Mode",
+      "properties": {
+        "aiWaitLessMode.urls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          },
+          "default": [],
+          "description": "Chrome 拡張未稼働時のフォールバック URL リスト (http:// または https:// のみ)"
+        },
+        "aiWaitLessMode.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "AI WaitLess Mode を有効化する"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "ws": "8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.0",
+    "@types/vscode": "1.90.0",
+    "@types/ws": "8.5.10",
+    "typescript": "5.5.4"
+  }
+}

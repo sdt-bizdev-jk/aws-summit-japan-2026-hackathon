@@ -75,6 +75,34 @@ WaitLess には拡張機能内蔵の読書ページ (`chrome-extension://<拡張
 - UI のカスタマイズ (フォント / 文字サイズ / テーマ) はなし
 - 端末間同期はなし (`chrome.storage.local` に閉じる、プライバシー方針に整合)
 
+## IDE 連携 (cycle-4 〜、実験的)
+
+cycle-4 から、Kiro IDE 用 VS Code 拡張機能 (`vscode-extension/`) との連携機能が追加されました。Kiro 上で AI 応答を待つ間、本 Chrome 拡張に登録された娯楽サイトを自動で開き、AI 完了で動画一時停止 + Kiro ウィンドウ最前面化を行います。
+
+### 仕組み
+
+- ローカルの WebSocket (`ws://127.0.0.1:39472`) で双方向通信 (外部公開なし)
+- Kiro 側拡張機能がサーバー、Chrome 拡張 (本 Service Worker) がクライアント
+- Service Worker 起動時に自動で接続を試行、失敗時は指数バックオフで永続再試行 (1秒 → 2秒 → ... → 30秒で頭打ち)
+- メッセージタイプ: `GET_SITES` / `FIND_OR_OPEN_TAB` / `PAUSE_MEDIA` / `PING`-`PONG`
+
+### 設定
+
+Options Page の「🔌 IDE 連携 (cycle-4 実験的)」セクションで ON/OFF を切り替えられます。デフォルトは **ON**。OFF にすると WebSocket 接続を切断し、再接続を停止します。
+
+cycle-3 までの既存機能 (Claude.ai 監視 → 自動切替) は IDE 連携の ON/OFF にかかわらず引き続き動作します (NFR-27 後方互換性)。
+
+### 利用条件
+
+- Kiro IDE がインストールされていること
+- `vscode-extension/` の WaitLess IDE 拡張機能が起動していること
+- macOS 環境 (osascript 前提)
+
+### 制約
+
+- VS Code 拡張機能側でポート 39472 が listen できていない場合 (別プロセスが使用中等) は接続できず、IDE 連携機能のみ無効化される (Chrome 拡張全体は動作継続)
+- 同時に複数の Kiro / VS Code ウィンドウを開いている場合の挙動は未保証 (1 ウィンドウ前提)
+
 ## 動作の概要
 
 - Claude.ai を開いて応答を待っているとき、応答ストリーミングが **しきい値秒** 以上 続くと、登録の上位から「現在の Chrome ウィンドウで同ドメインのタブが開いているか」を確認します

@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "WaitLess: AI 完了で Kiro に戻る",
+  "description": "AI 応答完了 / 入力要求時にトリガーファイルを作成し、WaitLess IDE 拡張機能の endWaiting を発火させて Kiro を最前面化する (cycle-4)",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+  },
+  "workspaceFolderName": "aws-summit-japan-2026-hackathon",
+  "shortName": "waitless-ai-wait-end"
+}

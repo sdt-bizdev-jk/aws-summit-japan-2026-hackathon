@@ -1,8 +1,8 @@
 # WaitLess — Backlog
 
-cycle-1 / cycle-2 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
+cycle-1 / cycle-2 / cycle-3 / cycle-4 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
 
-最終更新: 2026-05-27 (cycle-3 完了時点)
+最終更新: 2026-05-28 (cycle-4 動作確認完了時点)
 
 ---
 
@@ -117,6 +117,51 @@ cycle-1 / cycle-2 完了時点で抽出された「次にやるかもしれな�
 
 ---
 
+## cycle-4 で完了した項目
+
+cycle-4 (2026-05-27 完了) では以下を実装:
+
+### 新規 Unit
+- **Unit 1: vscode-extension** (新規 TypeScript 拡張機能、Kiro 用)
+  - `vscode-extension/src/extension.ts` (~530 行、9 論理コンポーネント)
+  - `vscode-extension/package.json` / `tsconfig.json` / `.gitignore` / `.vscodeignore`
+  - 設定: `aiWaitLessMode.urls` / `aiWaitLessMode.enabled`
+  - コマンド: `waitless.startWaiting` / `waitless.endWaiting`
+  - `tsc` フル strict ビルド成功、`out/extension.js` 22KB
+- **Unit 2: chrome-extension-bridge** (既存 Chrome 拡張への改修、v0.4.0)
+  - 新規: `extension/sw/ide_bridge.js` (~280 行) — WebSocket クライアント + IPC ディスパッチ
+  - 改修: `extension/service_worker.js` (2 行追加)、`extension/manifest.json` (v0.3.0 → v0.4.0)、Options Page (IPC ON/OFF トグル追加)
+- **Unit 3: agent-hooks-templates** (Hook テンプレート 2 バリアント)
+  - `vscode-extension/templates/hooks/{01-on-prompt-submit,02-on-agent-stop}.{variant-a,variant-b}.json` (4 ファイル)
+  - `vscode-extension/templates/hooks/README.md` (~150 行)
+
+### 新規機能
+- ローカル WebSocket IPC レイヤー (`ws://127.0.0.1:39472`) — 双方向、7 メッセージタイプ
+- 指数バックオフ再接続 (1→2→4→8→16→30s 頭打ち) + PING/PONG ヘルスチェック
+- Kiro Agent Hooks との連動 (promptSubmit / agentStop)
+- macOS osascript 経由の Kiro ウィンドウ最前面化
+- フォールバックパス: IPC 失敗時は `vscode.env.openExternal` で OS デフォルトブラウザ起動
+
+### NFR-27 (後方互換性) の実証
+- 既存 cycle-1〜3 のシナリオ (T-01〜T-30) に影響を出さないため、`extension/sw/{message_router,wait_orchestrator,tab_manager,settings_repository,runtime_state}.js` および `extension/content/*` 3 ファイル + `extension/reader/*` 4 ファイルは **完全無変更** (`git status` で実証済)
+- `extension/service_worker.js` への変更は **2 行追加のみ** (`import IdeBridge` + `IdeBridge.init()`)
+
+cycle-4 では以下の Backlog 項目は **対応せず継続**:
+- B-01〜B-11 すべて (cycle-4 のスコープから外した)
+
+cycle-4 で **新規追加** された Backlog 項目:
+- **B-12** [Medium] [Tech debt] cycle-4 デバッグログを本番化前に OFF にする (`extension/sw/ide_bridge.js` および `vscode-extension/src/extension.ts` の `DEBUG = true` を切替)
+- **B-13** [Medium] [Feature] Kiro アプリ名のハードコード (`APP_NAME_FOR_OSASCRIPT = 'Kiro'`) を `aiWaitLessMode.appName` で設定化 (R-02、Kiro 別名インストール対応)
+- **B-14** ✅ 完了 (cycle-4 検証済、2026-05-28) [Medium] [Tech debt] cycle-4 手動 E2E (T-41〜T-56) の実機検証 — Hook ブリッジ方式 + Chrome 前面化修正で動作確認済 (`docs/cycle-5-handover.md` §3 参照)
+- **B-15** [Low] [Feature] Antigravity 風の高度なブラウザ操作 (cycle-4 では sites 共有 + 動画一時停止のみ実装、もっと細かいタブ制御は将来 cycle)
+- **B-16** [Low] [Feature] Windows / Linux 対応 (cycle-4 は macOS osascript 限定)
+- **B-17** [Low] [Feature] VS Code Extension の VSIX パッケージング + Marketplace / Open VSX 公開 (cycle-4 はローカル開発のみ)
+- **B-18** [Low] [Tech debt] cycle-4 IPC プロトコルにバージョンフィールドを追加 (Q2=B でなしを選択、将来後方互換性が必要になった時に追加)
+- **B-19** [Low] [Feature] 複数の Kiro / VS Code ウィンドウ対応 (cycle-4 は 1 ウィンドウ前提、AS-01)
+- **B-20** [Medium] [Tech debt] **設計の再検討: Pattern γ → Pattern α 撤退判断** — cycle-4 動作確認後、要件 (URL ランダム選択 + 外部ブラウザ起動 + Kiro 戻り) は **Hook 単独 (Pattern α) でも実現可能** だったことが判明 (`open` コマンド + `osascript` で完結、約 10 行の JSON 2 つで足りる)。cycle-4 で実装した VS Code 拡張 (~530 行) + Chrome 拡張 IPC レイヤー (~280 行) は、動画自動再生/一時停止と既存タブ完全制御が必要な場合のみ価値がある。cycle-5 開始時、ユースケースを再評価して以下を判断する: (a) 現状維持 (Pattern γ)、(b) Pattern α へ撤退 (vscode-extension/ + extension/sw/ide_bridge.js を削除し、Hook を `open` + `osascript` 2 行に置換)、(c) ハイブリッド (Pattern γ を残しつつ Pattern α 版テンプレートも提供)。詳細は `docs/cycle-5-handover.md` §4.4 参照
+
+---
+
 ## Backlog 運用ルール
 
 - 新しい項目は末尾に追加し、ID (B-NN) を採番
@@ -165,8 +210,10 @@ cycle-3 では以下の Backlog 項目は **対応せず継続**:
 ## 関連ドキュメント
 
 - アーキテクチャ: `docs/architecture.md`
-- 次サイクルへの引き継ぎ: `docs/cycle-4-handover.md`
+- 次サイクルへの引き継ぎ: `docs/cycle-5-handover.md`
 - cycle-3 開始時の手引き (履歴): `docs/cycle-3-handover.md`
+- cycle-4 開始時の手引き (履歴): `docs/cycle-4-handover.md`
 - cycle-1 archive: `aidlc-docs-waitless-archive/cycle-1/`
 - cycle-2 archive: `aidlc-docs-waitless-archive/cycle-2/`
 - cycle-3 archive: `aidlc-docs-waitless-archive/cycle-3/`
+- cycle-4 archive: `aidlc-docs-waitless-archive/cycle-4/`
