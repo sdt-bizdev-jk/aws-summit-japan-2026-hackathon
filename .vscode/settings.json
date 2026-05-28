@@ -1,2 +1,8 @@
 {
+  "aiWaitLessMode.enabled": true,
+  "aiWaitLessMode.urls": [
+    "chrome-extension://<ID>/portal/portal.html",
+    "https://www.amazon.co.jp",
+    "https://www.youtube.com"
+  ]
 }

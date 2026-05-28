@@ -1,0 +1,79 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type":    "command",
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/start",
+            "async":   true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "AskUserQuestion|ExitPlanMode",
+        "hooks": [
+          {
+            "type":    "command",
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/start",
+            "async":   true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type":    "command",
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type":    "command",
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|idle_prompt|elicitation_dialog",
+        "hooks": [
+          {
+            "type":    "command",
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type":    "command",
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion|ExitPlanMode",
+        "hooks": [
+          {
+            "type":    "command",
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+          }
+        ]
+      }
+    ]
+  }
+}

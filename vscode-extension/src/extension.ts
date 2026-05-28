@@ -43,7 +43,13 @@ const IPC_PORT = 39472;
 const IPC_TIMEOUT_MS = 5000;
 const PING_INTERVAL_MS = 30_000;
 
-const APP_NAME_FOR_OSASCRIPT = 'Kiro';
+// 起動中の IDE 名 (VS Code: "Visual Studio Code" / Kiro: "Kiro" など) を
+// 実行時に取得する。osascript の `tell application "..."` に渡す名前は
+// /Applications/<Name>.app のバンドル名と一致する必要がある。
+// vscode.env.appName は VS Code / Kiro いずれでも .app 名と整合する値を返す。
+function getHostAppName(): string {
+  return vscode.env.appName;
+}
 
 const SETTINGS_NAMESPACE = 'aiWaitLessMode';
 const COMMAND_START = 'waitless.startWaiting';
@@ -215,15 +221,18 @@ class UrlListMerger {
   }
 
   /**
-   * BR-55: http: / https: のみ受け入れる。
-   * Source A の chrome-extension: スキームは IPC 経由で開かれる前提のため、
-   * フォールバック路 (vscode.env.openExternal) では弾く。
-   * ここでは保守的に http/https 限定にする (Source A 経由でも IPC が動かない場合は弾く)。
+   * BR-55 拡張: http: / https: / chrome-extension: を受け入れる。
+   * chrome-extension: は IPC 経由でのみ開ける (フォールバック路 vscode.env.openExternal
+   * では開けない)。フォールバックでの取り扱いは BrowserLauncher.open() 側で防御する。
    */
   private static isValidUrl(input: string): boolean {
     try {
       const u = new URL(input);
-      return u.protocol === 'http:' || u.protocol === 'https:';
+      return (
+        u.protocol === 'http:' ||
+        u.protocol === 'https:' ||
+        u.protocol === 'chrome-extension:'
+      );
     } catch {
       return false;
     }
@@ -482,9 +491,14 @@ class BrowserLauncher {
     }
 
     // フォールバック: vscode.env.openExternal (BR-49)
+    // chrome-extension: スキームは外部ブラウザで開けないため、IPC 失敗時は黙って諦める
+    if (!/^https?:\/\//i.test(url)) {
+      dwarn('BrowserLauncher: non-http(s) URL cannot be opened via fallback, skipping', url);
+      return;
+    }
     try {
       const uri = vscode.Uri.parse(url, true);
-      const ok = await vscode.env.openExternal(uri);
+      const ok  = await vscode.env.openExternal(uri);
       if (!ok) {
         dwarn('BrowserLauncher: openExternal returned false', url);
       } else {
@@ -499,8 +513,11 @@ class BrowserLauncher {
    * macOS で Chrome アプリを前面化する (IPC 経由で開いた後、Chrome 自体が
    * 背面にいる場合に見える状態にするため)。
    * 失敗しても黙って許容 (BR-52 と同様)。
+   *
+   * セッション 2 回目以降の startWaiting からも直接呼ばれる
+   * (URL は開かず、ユーザーが見ていたタブを尊重する目的)。
    */
-  private async activateBrowserApp(): Promise<void> {
+  async activateBrowserApp(): Promise<void> {
     if (process.platform !== 'darwin') {
       return;
     }
@@ -528,11 +545,12 @@ class WindowActivator {
     }
 
     // BR-51 / NFR-29: 配列引数で execFile を使う (シェルインジェクション対策)
-    // appName はハードコード "Kiro" (cycle-4 では設定化しない)
-    const script = `tell application "${APP_NAME_FOR_OSASCRIPT}" to activate`;
+    // appName は実行時の IDE 名 (VS Code: "Visual Studio Code" / Kiro: "Kiro") を使う
+    const appName = getHostAppName();
+    const script  = `tell application "${appName}" to activate`;
     try {
       await execFileAsync('osascript', ['-e', script]);
-      dlog('WindowActivator: Kiro activated');
+      dlog(`WindowActivator: ${appName} activated`);
     } catch (e) {
       // BR-52: 失敗してもサイクルは完了扱い、ユーザーに通知しない (silent)
       dwarn('WindowActivator: osascript failed', e);
@@ -552,14 +570,15 @@ class WindowActivator {
  * 関連 BR: BR-41, BR-43, BR-44, BR-47, BR-50, BR-58
  */
 class WaitOrchestratorIde {
-  private state: WaitState = 'idle';
+  private state         : WaitState = 'idle';
+  private hasOpenedOnce : boolean   = false;  // セッション初回フラグ
 
   constructor(
-    private readonly settings: SettingsReader,
-    private readonly ipc: IpcClient,
-    private readonly merger: UrlListMerger,
-    private readonly selector: UrlSelector,
-    private readonly launcher: BrowserLauncher,
+    private readonly settings : SettingsReader,
+    private readonly ipc      : IpcClient,
+    private readonly merger   : UrlListMerger,
+    private readonly selector : UrlSelector,
+    private readonly launcher : BrowserLauncher,
     private readonly activator: WindowActivator,
   ) {}
 
@@ -567,10 +586,9 @@ class WaitOrchestratorIde {
    * AI 待ち開始フロー。
    * 1. enabled=false → no-op (BR-41)
    * 2. state=waiting → 重複抑制 (BR-43)
-   * 3. URL リスト merge → 空なら no-op (BR-47)
-   * 4. URL を 1 件選択
-   * 5. ブラウザ起動
-   * 6. state を waiting に
+   * 3. **初回**: URL リスト merge → 選択 → ブラウザ起動 (URL を開く)
+   *    **2回目以降**: Chrome アプリを前面化するだけ (ユーザーが見ていたタブを尊重)
+   * 4. state を waiting に
    */
   async startWaiting(): Promise<void> {
     const settings = this.settings.getSettings();
@@ -581,6 +599,14 @@ class WaitOrchestratorIde {
 
     if (this.state === 'waiting') {
       dwarn('startWaiting: already waiting, no-op (BR-43)');
+      return;
+    }
+
+    // 2 回目以降: URL を開かずに Chrome を前面化するだけ
+    if (this.hasOpenedOnce) {
+      dlog('startWaiting: subsequent call, only activating Chrome');
+      await this.launcher.activateBrowserApp();
+      this.state = 'waiting';
       return;
     }
 
@@ -606,7 +632,8 @@ class WaitOrchestratorIde {
     dlog('startWaiting: opening', selected.url);
     await this.launcher.open(selected.url);
 
-    this.state = 'waiting';
+    this.state         = 'waiting';
+    this.hasOpenedOnce = true;
   }
 
   /**
