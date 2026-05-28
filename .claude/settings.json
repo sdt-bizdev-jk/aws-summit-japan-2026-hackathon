@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type":    "command",
-            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/start",
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/start && echo \"$(date '+%F %T') CC:UserPromptSubmit -> start\" >> /tmp/waitless-hook.log",
             "async":   true
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type":    "command",
-            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/start",
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/start && echo \"$(date '+%F %T') CC:PostToolUse(AskUserQuestion|ExitPlanMode) -> start\" >> /tmp/waitless-hook.log",
             "async":   true
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type":    "command",
-            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end && echo \"$(date '+%F %T') CC:Stop -> end\" >> /tmp/waitless-hook.log"
           }
         ]
       }
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type":    "command",
-            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end && echo \"$(date '+%F %T') CC:StopFailure -> end\" >> /tmp/waitless-hook.log"
           }
         ]
       }
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type":    "command",
-            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+            "command": "input=$(cat); mkdir -p /tmp/waitless-ide-triggers; touch /tmp/waitless-ide-triggers/end; { printf '%s CC:Notification -> end | stdin=' \"$(date '+%F %T')\"; printf '%s\\n' \"$input\"; } >> /tmp/waitless-hook.log"
           }
         ]
       }
@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type":    "command",
-            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end && echo \"$(date '+%F %T') CC:PermissionRequest -> end\" >> /tmp/waitless-hook.log"
           }
         ]
       }
@@ -70,7 +70,7 @@
         "hooks": [
           {
             "type":    "command",
-            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end"
+            "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end && echo \"$(date '+%F %T') CC:PreToolUse(AskUserQuestion|ExitPlanMode) -> end\" >> /tmp/waitless-hook.log"
           }
         ]
       }

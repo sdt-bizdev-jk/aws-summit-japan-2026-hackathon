@@ -1,14 +1,14 @@
 {
   "enabled": true,
-  "name": "WaitLess: AI 待ち開始 (Variant A: 直接コマンド)",
-  "description": "プロンプト送信時に WaitLess IDE 拡張機能の startWaiting コマンドを直接呼び出し、外部ブラウザで娯楽サイトを開く (cycle-4)",
-  "version": "1",
+  "name": "WaitLess: AI 待ち開始 (promptSubmit)",
+  "description": "プロンプト送信時にトリガーファイル (/tmp/waitless-ide-triggers/start) を作成し、WaitLess IDE 拡張機能の startWaiting を発火させて外部ブラウザで娯楽サイトを開く。Claude Code 側 .claude/settings.json の UserPromptSubmit フックと等価 (cycle-6)",
+  "version": "3",
   "when": {
     "type": "promptSubmit"
   },
   "then": {
     "type": "runCommand",
-    "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/start"
+    "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/start && echo \"$(date '+%F %T') KIRO:promptSubmit -> start\" >> /tmp/waitless-hook.log"
   },
   "workspaceFolderName": "aws-summit-japan-2026-hackathon",
   "shortName": "waitless-ai-wait-start"

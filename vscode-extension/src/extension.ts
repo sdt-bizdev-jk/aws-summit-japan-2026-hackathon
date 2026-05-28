@@ -79,6 +79,23 @@ function derror(...args: unknown[]): void {
   console.error(LOG_PREFIX, ...args);
 }
 
+// 発信元調査用: Hook 側と同じファイルに時系列で書く (/tmp/waitless-hook.log)
+const HOOK_LOG_PATH = '/tmp/waitless-hook.log';
+function appendHookLog(message: string): void {
+  try {
+    const now = new Date();
+    const stamp =
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-` +
+      `${String(now.getDate()).padStart(2, '0')} ` +
+      `${String(now.getHours()).padStart(2, '0')}:` +
+      `${String(now.getMinutes()).padStart(2, '0')}:` +
+      `${String(now.getSeconds()).padStart(2, '0')}`;
+    fs.appendFileSync(HOOK_LOG_PATH, `${stamp} ${message}\n`);
+  } catch (e) {
+    dwarn('appendHookLog failed', e);
+  }
+}
+
 // ----- Domain Types (functional-design/domain-entities.md 参照) -----
 
 interface AiWaitLessSettings {
@@ -731,7 +748,8 @@ function registerHookBridge(context: vscode.ExtensionContext): vscode.Disposable
 
       if (filename === TRIGGER_START) {
         dlog('HookBridge: TRIGGER_START detected');
-        
+        appendHookLog(`EXT(${getHostAppName()}):TRIGGER_START detected -> startWaiting`);
+
         // 即座に削除してから実行 (連続発火対策)
         try {
           fs.unlinkSync(target);
@@ -744,7 +762,8 @@ function registerHookBridge(context: vscode.ExtensionContext): vscode.Disposable
         );
       } else if (filename === TRIGGER_END) {
         dlog('HookBridge: TRIGGER_END detected');
-        
+        appendHookLog(`EXT(${getHostAppName()}):TRIGGER_END detected -> endWaiting`);
+
         try {
           fs.unlinkSync(target);
         } catch (e) {

@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "WaitLess: AI 入力要求で Kiro に戻る (preToolUse: AskUserQuestion|ExitPlanMode)",
+  "description": "ユーザー入力系ツール (AskUserQuestion / ExitPlanMode) 実行直前にトリガーファイル (/tmp/waitless-ide-triggers/end) を作成しつつ、osascript で Kiro を直接最前面化する。VS Code 拡張の fs.watch が macOS で時々イベントを取りこぼす問題への対策として、Hook 単独で Kiro 前面化を完結させる (cycle-7)。Claude Code 側 .claude/settings.json の PreToolUse(AskUserQuestion|ExitPlanMode) / Notification(permission_prompt|idle_prompt|elicitation_dialog) / PermissionRequest フック群と等価 (Kiro は通知系専用イベント型を持たないため preToolUse で代替集約)",
+  "version": "2",
+  "when": {
+    "type": "preToolUse",
+    "matcher": "AskUserQuestion|ExitPlanMode"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/end && osascript -e 'tell application \"Kiro\" to activate' && echo \"$(date '+%F %T') KIRO:preToolUse(AskUserQuestion|ExitPlanMode) -> end (+osascript)\" >> /tmp/waitless-hook.log"
+  },
+  "workspaceFolderName": "aws-summit-japan-2026-hackathon",
+  "shortName": "waitless-ai-wait-end-pre-tool"
+}

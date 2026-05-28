@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "WaitLess: AI 待ち再開 (postToolUse: AskUserQuestion|ExitPlanMode)",
+  "description": "ユーザー入力系ツール (AskUserQuestion / ExitPlanMode) 完了直後にトリガーファイル (/tmp/waitless-ide-triggers/start) を作成し、ユーザー応答後の AI 再稼働中に再び娯楽サイトを開く。Claude Code 側 .claude/settings.json の PostToolUse(AskUserQuestion|ExitPlanMode) フックと等価 (cycle-6)",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "matcher": "AskUserQuestion|ExitPlanMode"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "mkdir -p /tmp/waitless-ide-triggers && touch /tmp/waitless-ide-triggers/start && echo \"$(date '+%F %T') KIRO:postToolUse(AskUserQuestion|ExitPlanMode) -> start\" >> /tmp/waitless-hook.log"
+  },
+  "workspaceFolderName": "aws-summit-japan-2026-hackathon",
+  "shortName": "waitless-ai-wait-start-post-tool"
+}
