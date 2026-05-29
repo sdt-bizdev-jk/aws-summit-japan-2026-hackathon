@@ -199,7 +199,7 @@ export async function injectPlaybackPause(tabId) {
 /**
  * 指定タブの status が 'complete' になるまで待つ (最大 timeoutMs)。
  */
-function waitForTabComplete(tabId, timeoutMs = 8000) {
+export function waitForTabComplete(tabId, timeoutMs = 8000) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = () => {

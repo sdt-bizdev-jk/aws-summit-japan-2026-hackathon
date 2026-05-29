@@ -2,7 +2,7 @@
 
 cycle-1 / cycle-2 / cycle-3 / cycle-4 / cycle-5 / cycle-6 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
 
-最終更新: 2026-05-29 (cycle-7 待ち時間文脈取り込み 部分実装完了時点)
+最終更新: 2026-05-29 (cycle-8 エンタメ発見ポップアップ追加完了時点)
 
 ---
 
@@ -261,6 +261,35 @@ cycle-7 で **新規追加** された Backlog 項目:
 - **B-36** [Medium] [Feature] Options Page への文脈取り込み ON/OFF トグル + 設定 UI (FR-08: 取得文字数上限、既定反映形式の設定)
 - **B-37** [Low] [Feature] 次の待ちサイクル開始時に前回の文脈履歴をクリア (FR-09)
 - **B-38** [Low] [Tech debt] `context_repository.js` のデバッグログ OFF (`DEBUG = true`、B-02/B-32 と同類)
+
+---
+
+## cycle-8 で完了した項目
+
+cycle-8 (2026-05-29 完了) では以下を実装 (AIDLC プロセスなし):
+
+### エンタメ発見ポップアップ
+- **新規** `extension/sw/entertainment_ads.js`
+  - `ADS[]`: ハードコードのレコメンド 4 件 (映画予告 YouTube 3 本 + Google Books 読書 1 件)
+  - `pickAd()`: ランダムに 1 件選択
+  - `showAdPopup(tabId, ad?)`: タブへポップアップを注入 (best-effort)
+  - `injectAdPopup(ad)` (executeScript func): フェード + スケールインで画面中央に表示。映画は 16:9 iframe (YouTube autoplay+mute)、読書はグラデ + 絵文字サムネ。×/背景クリック or タイムアウトで自動消去
+- **新規** `extension/player/{player.html, player.js}`: 内蔵プレイヤーページ (?v=<videoId> で YouTube 全面表示)。manifest に追加済みだが現状未使用
+- **改修** `extension/sw/wait_orchestrator.js`: `onWaitDetected()` で `ads_enabled` チェックを追加。ON (デフォルト) 時は既存タブ切替をスキップしてポップアップ表示
+- **改修** `extension/sw/tab_manager.js`: `waitForTabComplete` を `export` に変更
+- **改修** `extension/options/{options.html, options.js}`: 「エンタメ発見ポップアップ」セクション + `initAdsToggle()` 追加
+
+### 重要な設計変更
+`ads_enabled = true`（デフォルト）の場合、**従来のタブ切替フローを完全にスキップ**する。ポップアップ機能を ON にすると cycle-1〜7 の主要体験（遷移先タブへの切替）は動作しなくなる（`ads_enabled = false` で従来動作に戻る）。
+
+cycle-8 では以下の Backlog 項目は **対応せず継続**:
+- B-01〜B-38 すべて (cycle-8 のスコープから外した)
+
+cycle-8 で **新規追加** された Backlog 項目:
+- **B-39** [Medium] [Feature] レコメンドの動的化・件数増 (現状はハードコード 4 件のみ。ジャンル多様化・外部フィードとの連携等)
+- **B-40** [Medium] [Feature] ads ON 時の AI 生成完了連動でポップアップを自動消去 (現状は completion イベントでポップアップが残り、60 秒タイムアウトまで表示される)
+- **B-41** [Low] [Tech debt] `player/player.html|js` の活用または削除 (manifest に追加済みだが現状未使用)
+- **B-42** [Low] [Tech debt] `entertainment_ads.js` のデバッグログ OFF (`DEBUG = true`、B-02/B-32/B-38 と同類)
 
 ---
 

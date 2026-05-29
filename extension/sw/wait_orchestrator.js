@@ -13,6 +13,7 @@ import * as RuntimeState from './runtime_state.js';
 import * as StatsRepository from './stats_repository.js';
 import * as LeisureClassifier from './leisure_classifier.js';
 import * as ContextRepository from './context_repository.js';
+import * as EntertainmentAds from './entertainment_ads.js';
 
 const DEBUG = true;
 function dlog(...args) {
@@ -142,6 +143,25 @@ export async function onWaitDetected(claudeTabId, _durationMs) {
     dlog('no registered sites; aborting');
     await RuntimeState.setWaiting(false);
     // cycle-6: statsPending は残し、完了時に「切替なしサイクル」として確定する (F6=A, BR-83)
+    return;
+  }
+
+  // cycle-7: エンタメ発見ポップアップが有効な場合、外部タブへは一切遷移しない。
+  // タブ切替の代わりに、現在の AI タブ (claude.ai) 中央へポップアップを表示する。
+  let adsEnabled = true;
+  try {
+    const stored = await chrome.storage.local.get('ads_enabled');
+    adsEnabled = !(stored && stored.ads_enabled === false);
+  } catch (_e) {
+    adsEnabled = true;
+  }
+
+  if (adsEnabled) {
+    dlog('ads on; showing popup on AI tab without switching tabs');
+    await RuntimeState.setWaiting(false);
+    if (claudeTabId != null) {
+      await EntertainmentAds.showAdPopup(claudeTabId);
+    }
     return;
   }
 

@@ -119,6 +119,8 @@
       App.injectDashboardLink();
       // cycle-4: IPC ON/OFF トグルの初期化
       App.initIpcToggle();
+      // cycle-7: エンタメ発見ポップアップ ON/OFF トグルの初期化
+      App.initAdsToggle();
       this.settings = await OptionsAPI.getSettings();
       this.bindEvents();
       this.render();
@@ -221,6 +223,29 @@
           const _ = chrome.runtime.lastError;
           // Service Worker 側 IdeBridge が storage.onChanged を購読しているので、
           // ここでは保存するだけで、init() / shutdown() は自動的に呼ばれる。
+        });
+      });
+    },
+
+    /**
+     * cycle-7: エンタメ発見ポップアップ ON/OFF トグルの初期化と change ハンドラ。
+     * chrome.storage.local.ads_enabled の get/set を担当。
+     * デフォルト true (ads_enabled キー未設定時)。SW 側 EntertainmentAds が表示前に参照する。
+     */
+    initAdsToggle() {
+      const toggle = document.getElementById('ads-toggle');
+      if (!toggle) return;
+
+      chrome.storage.local.get('ads_enabled', (stored) => {
+        const _ = chrome.runtime.lastError;
+        // デフォルト true (false が明示的にセットされている場合のみ false)
+        toggle.checked = stored && stored.ads_enabled !== false;
+      });
+
+      toggle.addEventListener('change', () => {
+        const next = toggle.checked;
+        chrome.storage.local.set({ ads_enabled: next }, () => {
+          const _ = chrome.runtime.lastError;
         });
       });
     },
