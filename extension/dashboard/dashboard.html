@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WaitLess ダッシュボード</title>
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body class="dashboard">
+  <header class="dash-header">
+    <h1 class="dash-title"><span class="dash-title-emoji">📊</span> WaitLess ダッシュボード</h1>
+    <nav class="dash-nav">
+      <a class="dash-nav-link" id="nav-portal" href="#" data-testid="dashboard-nav-portal">🎬 娯楽ポータルへ</a>
+    </nav>
+  </header>
+
+  <main class="dash-main">
+    <!-- 空状態 (データ0件、BR-101) -->
+    <div class="empty-state" id="empty-state" data-testid="dashboard-empty-state" hidden>
+      <div class="empty-emoji">🗒️</div>
+      <p class="empty-title">まだ記録がありません</p>
+      <p class="empty-desc">生成 AI の待ち時間が発生すると、ここに統計が表示されます。</p>
+    </div>
+
+    <!-- コンテンツ (データあり) -->
+    <div class="dash-content" id="dash-content" hidden>
+      <!-- サマリカード群 -->
+      <section class="summary-section">
+        <h2 class="section-title">今日のサマリ</h2>
+        <div class="summary-grid" id="summary-grid" data-testid="dashboard-summary-grid">
+          <!-- JS で描画 -->
+        </div>
+      </section>
+
+      <!-- 余暇種別の内訳 (M-03) -->
+      <section class="genre-section">
+        <h2 class="section-title">今日の余暇種別の内訳</h2>
+        <ul class="genre-list" id="genre-list" data-testid="dashboard-genre-list">
+          <!-- JS で描画 -->
+        </ul>
+        <p class="genre-empty" id="genre-empty" hidden>今日はまだ娯楽タブへの切り替えがありません。</p>
+      </section>
+
+      <!-- 週次トレンド (M-01/M-02 トグル, F7=C) -->
+      <section class="trend-section">
+        <div class="trend-header">
+          <h2 class="section-title">週次トレンド (直近7日)</h2>
+          <div class="trend-toggle" id="trend-toggle" role="group" aria-label="トレンド指標切替">
+            <button class="trend-toggle-btn is-active" id="toggle-leisure" data-metric="leisure" data-testid="dashboard-toggle-leisure">ダメになった時間</button>
+            <button class="trend-toggle-btn" id="toggle-wait" data-metric="wait" data-testid="dashboard-toggle-wait">待ち時間</button>
+          </div>
+        </div>
+        <div class="trend-chart" id="trend-chart" data-testid="dashboard-trend-chart">
+          <!-- JS で描画 -->
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="dash-footer">
+    <p>すべての統計はこの端末内 (chrome.storage.local) にのみ保存され、外部には送信されません。</p>
+  </footer>
+
+  <!-- 依存ゼロ: 通常スクリプトで順に読み込む (ESM 不使用) -->
+  <script src="stats_aggregator.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

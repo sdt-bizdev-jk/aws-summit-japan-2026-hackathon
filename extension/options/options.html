@@ -38,6 +38,22 @@
     <section class="section" aria-labelledby="sites-heading">
       <h2 id="sites-heading">📋 登録した娯楽サイト</h2>
 
+      <!-- cycle-6: 統計ダッシュボードへの動線 (常時表示, FR-84) -->
+      <div class="dashboard-banner" data-testid="dashboard-banner">
+        <span class="dashboard-banner-icon" aria-hidden="true">📊</span>
+        <span class="dashboard-banner-text">
+          待ち時間や余暇種別の統計を確認できます。
+        </span>
+        <a
+          id="dashboard-open-link"
+          data-testid="dashboard-open-link"
+          class="dashboard-banner-button"
+          href="#"
+          target="_blank"
+          rel="noopener"
+        >統計ダッシュボードを開く</a>
+      </div>
+
       <div id="empty-state" class="empty-state" data-testid="empty-state" hidden>
         <p>まだ登録がありません。</p>
         <p>最低 1件 登録すると WaitLess が動作します。<br>

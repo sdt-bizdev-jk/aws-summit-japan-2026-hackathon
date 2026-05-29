@@ -58,6 +58,28 @@ function handle(message, sender, sendResponse) {
       return false;
     }
 
+    case 'RESUME_ACTION': {
+      // cycle-6: 復帰後の最初の操作 (M-05) または操作なしタイムアウト (M-07)
+      if (payload && payload.outcome === 'timeout') {
+        WaitOrchestrator.onResumeTimeout().catch((e) => {
+          console.error('[WaitLess] RESUME_ACTION(timeout) handling failed', e);
+        });
+      } else {
+        WaitOrchestrator.onResumeAction(payload && payload.at).catch((e) => {
+          console.error('[WaitLess] RESUME_ACTION handling failed', e);
+        });
+      }
+      return false;
+    }
+
+    case 'RE_LEFT': {
+      // cycle-6: 復帰後しきい値内の自発的な再離脱 (M-04)
+      WaitOrchestrator.onReLeft().catch((e) => {
+        console.error('[WaitLess] RE_LEFT handling failed', e);
+      });
+      return false;
+    }
+
     case 'GET_SETTINGS': {
       SettingsRepository.getSettings()
         .then((s) => sendResponse(s))

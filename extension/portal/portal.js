@@ -25,6 +25,8 @@
   // Bootstrap
   // --------------------------------------------------------------------------
   function bootstrap() {
+    setupDashboardLink();
+
     const container = document.getElementById("genre-container");
     const loading   = document.getElementById("loading-message");
 
@@ -56,6 +58,22 @@
     container.appendChild(fragment);
 
     log(`render complete: ${data.length} genres / ${renderedCardCount} cards`);
+  }
+
+  // --------------------------------------------------------------------------
+  // ダッシュボードへの動線 (cycle-6, FR-84)
+  //   chrome.runtime.getURL("dashboard/dashboard.html") を href に注入
+  // --------------------------------------------------------------------------
+  function setupDashboardLink() {
+    const link = document.getElementById("nav-dashboard");
+    if (!link) return;
+    try {
+      if (chrome && chrome.runtime && chrome.runtime.getURL) {
+        link.href = chrome.runtime.getURL("dashboard/dashboard.html");
+      }
+    } catch (e) {
+      warn("dashboard リンクの解決に失敗:", e);
+    }
   }
 
   // --------------------------------------------------------------------------

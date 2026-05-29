@@ -10,10 +10,82 @@
 import * as TabManager from './tab_manager.js';
 import * as SettingsRepository from './settings_repository.js';
 import * as RuntimeState from './runtime_state.js';
+import * as StatsRepository from './stats_repository.js';
+import * as LeisureClassifier from './leisure_classifier.js';
 
 const DEBUG = true;
 function dlog(...args) {
   if (DEBUG) console.log('[WaitLess][SW]', ...args);
+}
+
+/**
+ * cycle-6: 切替先タブの URL を取得して余暇種別を判定し、進行中サイクルへ補完する。
+ * best-effort: 失敗してもコア体験を止めない (BR-97, NFR-74)。
+ *
+ * @param {number} tabId 切替先タブ
+ */
+async function attachLeisureStats(tabId) {
+  try {
+    const pending = RuntimeState.getStatsPending();
+    if (!pending) return;
+
+    let url = '';
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      url = (tab && tab.url) || (tab && tab.pendingUrl) || '';
+    } catch (_e) {
+      url = '';
+    }
+
+    const domain = TabManager.extractDomain(url);
+    const { genreId } = LeisureClassifier.classify(url);
+
+    pending.leisureStartAt = Date.now();
+    pending.leisureDomain = domain || null;
+    pending.leisureGenreId = genreId || null;
+    await RuntimeState.setStatsPending(pending);
+    dlog('attachLeisureStats', { tabId, domain, genreId });
+  } catch (e) {
+    dlog('attachLeisureStats failed (ignored)', e);
+  }
+}
+
+/**
+ * cycle-6: 進行中の統計サイクルを確定して stats_events へ記録する (BR-82, BR-83, BR-85)。
+ * 切替なし (leisureStartAt=null) でも記録する (F6=A)。
+ * best-effort: 失敗してもコア体験を止めない (BR-97)。
+ */
+async function finalizeStatsCycle() {
+  try {
+    const p = RuntimeState.getStatsPending();
+    if (!p) return;
+
+    const now = Date.now();
+    const hasLeisure = p.leisureStartAt != null;
+    const event = {
+      id: p.id,
+      source: 'chrome',
+      waitStartAt: p.waitStartAt,
+      waitEndAt: now,
+      leisureStartAt: hasLeisure ? p.leisureStartAt : null,
+      leisureEndAt: hasLeisure ? now : null,
+      leisureGenreId: hasLeisure ? p.leisureGenreId : null,
+      leisureDomain: hasLeisure ? p.leisureDomain : null,
+      resumeActionAt: null,
+      // 切替ありなら復帰監視対象 ('pending')、切替なしは対象外 (null)
+      resumeOutcome: hasLeisure ? 'pending' : null,
+      reLeftWithinStay: hasLeisure ? false : null,
+      dateKey: p.dateKey || StatsRepository.toDateKey(p.waitStartAt),
+    };
+    await StatsRepository.appendEvent(event);
+    await RuntimeState.setStatsPending(null);
+
+    // 切替ありサイクルのみ、復帰操作/再離脱の解決対象として id を保持 (M-04/M-05)
+    await RuntimeState.setStatsResumeTargetId(hasLeisure ? p.id : null);
+    dlog('finalizeStatsCycle', event.id, 'hasLeisure=', hasLeisure);
+  } catch (e) {
+    dlog('finalizeStatsCycle failed (ignored)', e);
+  }
 }
 
 /**
@@ -36,6 +108,23 @@ export async function onWaitDetected(claudeTabId, _durationMs) {
   await RuntimeState.setWaiting(true);
   await RuntimeState.setClaudeTabId(claudeTabId);
 
+  // cycle-6: 進行中の統計サイクルを開始 (BR-81, BR-83, F1=B)
+  // 既存の未確定 pending があれば放棄して上書き (BR-81)
+  try {
+    const now = Date.now();
+    await RuntimeState.setStatsPending({
+      id: `chrome-${now}`,
+      source: 'chrome',
+      waitStartAt: now,
+      leisureStartAt: null,
+      leisureDomain: null,
+      leisureGenreId: null,
+      dateKey: StatsRepository.toDateKey(now),
+    });
+  } catch (e) {
+    dlog('beginCycle (statsPending) failed (ignored)', e);
+  }
+
   let sites;
   try {
     sites = await SettingsRepository.getSites();
@@ -43,6 +132,7 @@ export async function onWaitDetected(claudeTabId, _durationMs) {
   } catch (e) {
     console.error('[WaitLess][SW] getSites failed', e);
     await RuntimeState.setWaiting(false);
+    // cycle-6: statsPending は残し、完了時に「切替なしサイクル」として確定する (F6=A, BR-83)
     return;
   }
 
@@ -50,6 +140,7 @@ export async function onWaitDetected(claudeTabId, _durationMs) {
   if (!sites || sites.length === 0) {
     dlog('no registered sites; aborting');
     await RuntimeState.setWaiting(false);
+    // cycle-6: statsPending は残し、完了時に「切替なしサイクル」として確定する (F6=A, BR-83)
     return;
   }
 
@@ -59,6 +150,7 @@ export async function onWaitDetected(claudeTabId, _durationMs) {
     // 異常: ウィンドウ取得失敗等
     dlog('findOrOpenPlaySite returned null; aborting');
     await RuntimeState.setWaiting(false);
+    // cycle-6: statsPending は残し、完了時に「切替なしサイクル」として確定する (F6=A, BR-83)
     return;
   }
 
@@ -72,6 +164,9 @@ export async function onWaitDetected(claudeTabId, _durationMs) {
 
   await RuntimeState.setPlayTabId(result.tabId);
   dlog('switched to play tab', result.tabId);
+
+  // cycle-6: 切替先の余暇種別を判定して進行中サイクルに補完 (BR-84, A5=A)
+  await attachLeisureStats(result.tabId);
 }
 
 /**
@@ -83,6 +178,10 @@ export async function onWaitDetected(claudeTabId, _durationMs) {
  * @param {number|null} claudeTabId 完了発火元の Claude.ai タブの ID
  */
 export async function onCompletionDetected(claudeTabId) {
+  // cycle-6: 統計サイクルの確定 (isWaiting ガードより前。切替なしでも記録する F6=A, BR-83)
+  // ClaudeSiteAdapter は WAIT_DETECTED 送信済みなら必ず COMPLETION_DETECTED を送る。
+  await finalizeStatsCycle();
+
   if (!RuntimeState.isWaiting()) {
     return; // ガード (BR-13)
   }
@@ -125,4 +224,51 @@ export async function onCompletionDetected(claudeTabId) {
  */
 export async function reset() {
   await RuntimeState.reset();
+}
+
+/**
+ * cycle-6: 復帰後の最初のユーザー操作を受けて集中復帰秒数を解決する (BR-93, M-05)。
+ * @param {number} at 操作時刻 (epoch ms)
+ */
+export async function onResumeAction(at) {
+  try {
+    const id = RuntimeState.getStatsResumeTargetId();
+    if (!id) return;
+    const resumeAt = (typeof at === 'number' && isFinite(at)) ? at : Date.now();
+    await StatsRepository.resolveResume(id, { resumeActionAt: resumeAt, outcome: 'resumed' });
+    // 解決済みなので対象をクリア (再離脱判定は別途継続する場合があるが、復帰は一度きり)
+    await RuntimeState.setStatsResumeTargetId(null);
+    dlog('onResumeAction resolved', id);
+  } catch (e) {
+    dlog('onResumeAction failed (ignored)', e);
+  }
+}
+
+/**
+ * cycle-6: 復帰タイムアウト (操作なし) を受けて未復帰として確定する (BR-94, M-07)。
+ */
+export async function onResumeTimeout() {
+  try {
+    const id = RuntimeState.getStatsResumeTargetId();
+    if (!id) return;
+    await StatsRepository.resolveResume(id, { resumeActionAt: null, outcome: 'timeout' });
+    await RuntimeState.setStatsResumeTargetId(null);
+    dlog('onResumeTimeout resolved', id);
+  } catch (e) {
+    dlog('onResumeTimeout failed (ignored)', e);
+  }
+}
+
+/**
+ * cycle-6: 復帰後しきい値内の自発的な再離脱を記録する (BR-90, BR-91, M-04)。
+ */
+export async function onReLeft() {
+  try {
+    const id = RuntimeState.getStatsResumeTargetId();
+    if (!id) return;
+    await StatsRepository.markReLeft(id, true);
+    dlog('onReLeft recorded', id);
+  } catch (e) {
+    dlog('onReLeft failed (ignored)', e);
+  }
 }

@@ -14,6 +14,10 @@ const state = {
   isWaiting: false,
   claudeTabId: null,
   playTabId: null,
+  // cycle-6: 進行中の統計サイクル (PendingCycle) を 1 件保持 (BR-81, F1=B)
+  statsPending: null,
+  // cycle-6: 復帰操作/再離脱の解決対象となる確定済みサイクル id (娯楽切替ありのみ)
+  statsResumeTargetId: null,
 };
 
 /**
@@ -75,5 +79,41 @@ export async function reset() {
   state.isWaiting = false;
   state.claudeTabId = null;
   state.playTabId = null;
+  state.statsPending = null;
+  state.statsResumeTargetId = null;
+  await persist();
+}
+
+/**
+ * cycle-6: 進行中の統計サイクル (PendingCycle) を取得する (BR-81, F1=B)
+ * @returns {object|null}
+ */
+export function getStatsPending() {
+  return state.statsPending;
+}
+
+/**
+ * cycle-6: 進行中の統計サイクルを保持する。null でクリア。
+ * @param {object|null} pending
+ */
+export async function setStatsPending(pending) {
+  state.statsPending = pending == null ? null : pending;
+  await persist();
+}
+
+/**
+ * cycle-6: 復帰操作/再離脱の解決対象 id を取得する。
+ * @returns {string|null}
+ */
+export function getStatsResumeTargetId() {
+  return state.statsResumeTargetId;
+}
+
+/**
+ * cycle-6: 復帰操作/再離脱の解決対象 id を保持する。null でクリア。
+ * @param {string|null} id
+ */
+export async function setStatsResumeTargetId(id) {
+  state.statsResumeTargetId = id == null ? null : String(id);
   await persist();
 }

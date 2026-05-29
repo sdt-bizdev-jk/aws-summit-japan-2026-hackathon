@@ -42,6 +42,13 @@
   let waitTimerId = null;
   let thresholdSec = DEFAULT_THRESHOLD_SEC;
 
+  // ----- cycle-6: 復帰検知 / 再離脱検知 (M-04, M-05, M-07) -----
+  const RESUME_TIMEOUT_MS = 120_000; // F2=B: 操作なしタイムアウト
+  const STAY_WINDOW_MS = 30_000;     // F3=A: 再離脱判定窓
+  // 復帰監視の有効化フラグと後始末 (一度きり)
+  let resumeWatch = null; // { cleanup, timeoutId }
+  let reLeftWatch = null; // { cleanup, timeoutId }
+
   /**
    * 停止ボタンの存在を判定 (Q1=A, Q2=C+D)
    * 属性セレクタ -> テキストフォールバックの順
@@ -140,6 +147,100 @@
     contextInvalidated = true;
     debugLog('extension context invalidated; reload this tab to resume.');
     cancelWaitTimer();
+    disarmResumeWatch();
+    disarmReLeftWatch();
+  }
+
+  // ----- cycle-6: 復帰検知 (M-05 / M-07) -----
+  /**
+   * AI 完了後、最初のユーザー操作 (scroll/mousemove/keydown/click のどれか早い) を
+   * 検知して RESUME_ACTION を送る (BR-93, C2=A)。
+   * RESUME_TIMEOUT_MS 以内に操作がなければ outcome=timeout を送る (BR-94, M-07)。
+   */
+  function armResumeWatch() {
+    disarmResumeWatch();
+
+    const events = ['scroll', 'mousemove', 'keydown', 'click'];
+    const onAction = () => {
+      const at = Date.now();
+      disarmResumeWatch();
+      sendMessage('RESUME_ACTION', { claudeTabId: null, at });
+      debugLog('resume action detected; RESUME_ACTION sent');
+    };
+
+    const timeoutId = setTimeout(() => {
+      disarmResumeWatch();
+      sendMessage('RESUME_ACTION', { claudeTabId: null, outcome: 'timeout' });
+      debugLog('resume timeout; RESUME_ACTION(timeout) sent');
+    }, RESUME_TIMEOUT_MS);
+
+    const cleanup = () => {
+      for (const ev of events) {
+        try { window.removeEventListener(ev, onAction, true); } catch (_e) {}
+      }
+      if (resumeWatch && resumeWatch.timeoutId != null) {
+        clearTimeout(resumeWatch.timeoutId);
+      }
+    };
+
+    for (const ev of events) {
+      window.addEventListener(ev, onAction, { capture: true, once: false, passive: true });
+    }
+    resumeWatch = { cleanup, timeoutId };
+  }
+
+  function disarmResumeWatch() {
+    if (resumeWatch) {
+      try { resumeWatch.cleanup(); } catch (_e) {}
+      resumeWatch = null;
+    }
+  }
+
+  // ----- cycle-6: 再離脱検知 (M-04) -----
+  /**
+   * AI 完了後 STAY_WINDOW_MS 以内に、タブが hidden になったら「自発的な再離脱」とみなし
+   * RE_LEFT を送る (BR-90)。ただし、新しい待ちサイクル (STREAMING 再検知) に起因する
+   * hidden は正規プロセスとして除外する (BR-91, F3 コメント)。
+   */
+  function armReLeftWatch() {
+    disarmReLeftWatch();
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'hidden') return;
+      // BR-91: 新サイクル起因 (STREAMING/WAITING に遷移済み) の hidden は除外
+      if (state === 'STREAMING' || state === 'WAITING') {
+        debugLog('hidden during new cycle (legit); RE_LEFT suppressed');
+        disarmReLeftWatch();
+        return;
+      }
+      // 自発的な再離脱
+      disarmReLeftWatch();
+      sendMessage('RE_LEFT', { claudeTabId: null });
+      debugLog('voluntary re-leave detected; RE_LEFT sent');
+    };
+
+    const timeoutId = setTimeout(() => {
+      // 窓を抜けたら監視終了 (継続成功 = reLeftWithinStay は false のまま)
+      disarmReLeftWatch();
+      debugLog('stay window passed; treated as stayed');
+    }, STAY_WINDOW_MS);
+
+    const cleanup = () => {
+      try { document.removeEventListener('visibilitychange', onVisibility, true); } catch (_e) {}
+      if (reLeftWatch && reLeftWatch.timeoutId != null) {
+        clearTimeout(reLeftWatch.timeoutId);
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility, true);
+    reLeftWatch = { cleanup, timeoutId };
+  }
+
+  function disarmReLeftWatch() {
+    if (reLeftWatch) {
+      try { reLeftWatch.cleanup(); } catch (_e) {}
+      reLeftWatch = null;
+    }
   }
 
   /**
@@ -152,6 +253,9 @@
 
     if (isStreaming && state === 'IDLE') {
       state = 'STREAMING';
+      // cycle-6: 新サイクル開始 → 前サイクルの復帰監視を終了 (BR-91: これ以降の hidden は正規離脱)
+      disarmResumeWatch();
+      disarmReLeftWatch();
       startWaitTimer();
     } else if (!isStreaming && state === 'STREAMING') {
       // 短い応答 (N秒未満で完了) → タイマー破棄、何も送らない
@@ -163,6 +267,9 @@
       debugLog('COMPLETION_DETECTED sent');
       sendMessage('COMPLETION_DETECTED', { claudeTabId: null });
       state = 'IDLE';
+      // cycle-6: 復帰検知 + 再離脱検知を arm (M-04/M-05/M-07)
+      armResumeWatch();
+      armReLeftWatch();
     }
     // それ以外 (state==STREAMING and isStreaming==true) はタイマー継続中
     // それ以外 (state==WAITING and isStreaming==true) はまだ続いている

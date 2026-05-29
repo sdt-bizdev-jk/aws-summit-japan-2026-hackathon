@@ -1,0 +1,299 @@
+/*
+ * WaitLess Dashboard (cycle-6)
+ * ダーク基調 (#0a0a0f) + 紫アクセント (#7c3aed)。ポータル (cycle-5) とテーマ統一 (FR-83)。
+ * 依存ゼロ・純粋 CSS。グラフは div の width/height % で表現 (NFR-72)。
+ */
+
+:root {
+  --bg: #0a0a0f;
+  --bg-grad: radial-gradient(1200px 600px at 70% -10%, #1a1030 0%, #0a0a0f 60%);
+  --card: #16161f;
+  --card-hover: #1d1d2a;
+  --accent: #7c3aed;
+  --accent-soft: #a774f5;
+  --accent-dim: #3b2a5e;
+  --text: #e9e9f2;
+  --muted: #9a9ab0;
+  --border: #26263a;
+  --good: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body.dashboard {
+  background: var(--bg-grad), var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", Meiryo, sans-serif;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ---------- Header ---------- */
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dash-title {
+  font-size: 1.6rem;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.dash-title-emoji { margin-right: 8px; }
+
+.dash-nav-link {
+  color: var(--accent-soft);
+  text-decoration: none;
+  font-size: 0.95rem;
+  padding: 8px 16px;
+  border: 1px solid var(--accent-dim);
+  border-radius: 999px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.dash-nav-link:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+/* ---------- Main ---------- */
+.dash-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+}
+
+.section-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--text);
+}
+
+.summary-section,
+.genre-section,
+.trend-section { margin-bottom: 40px; }
+
+/* ---------- Summary cards ---------- */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-dim);
+  background: var(--card-hover);
+}
+
+.stat-card.hero {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, #1e1340 0%, #16161f 70%);
+  border-color: var(--accent);
+}
+
+.stat-icon { font-size: 1.4rem; }
+.stat-label { font-size: 0.85rem; color: var(--muted); }
+.stat-value {
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.stat-card.hero .stat-value {
+  font-size: 2.6rem;
+  color: var(--accent-soft);
+}
+.stat-sub { font-size: 0.8rem; color: var(--muted); }
+
+/* ---------- Genre breakdown ---------- */
+.genre-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.genre-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 120px;
+  align-items: center;
+  gap: 14px;
+}
+
+.genre-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.genre-emoji { font-size: 1.1rem; }
+
+.genre-bar {
+  background: #11111a;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  height: 16px;
+  overflow: hidden;
+}
+.genre-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-soft) 100%);
+  border-radius: 999px 0 0 999px;
+  width: 0%;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+.genre-value {
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.genre-empty { color: var(--muted); font-size: 0.9rem; }
+
+/* ---------- Weekly trend ---------- */
+.trend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.trend-header .section-title { margin: 0; }
+
+.trend-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.trend-toggle-btn {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.trend-toggle-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 220px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.trend-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 8px;
+}
+
+.trend-bar-track {
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100%;
+}
+
+.trend-bar-fill {
+  width: 60%;
+  max-width: 48px;
+  background: linear-gradient(180deg, var(--accent-soft) 0%, var(--accent) 100%);
+  border-radius: 8px 8px 0 0;
+  min-height: 2px;
+  height: 0%;
+  transition: height 0.4s ease;
+  position: relative;
+}
+.trend-bar.is-today .trend-bar-fill {
+  background: linear-gradient(180deg, #fff 0%, var(--accent-soft) 100%);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+.trend-bar-value {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.trend-bar-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.trend-bar.is-today .trend-bar-label {
+  color: var(--accent-soft);
+  font-weight: 700;
+}
+
+/* ---------- Empty state ---------- */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--muted);
+}
+.empty-emoji { font-size: 3rem; margin-bottom: 12px; }
+.empty-title { font-size: 1.3rem; color: var(--text); margin: 0 0 8px; }
+.empty-desc { font-size: 0.95rem; margin: 0; }
+
+/* ---------- Footer ---------- */
+.dash-footer {
+  border-top: 1px solid var(--border);
+  padding: 20px 32px;
+  text-align: center;
+}
+.dash-footer p { color: var(--muted); font-size: 0.8rem; margin: 0; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .dash-header, .dash-main { padding-left: 16px; padding-right: 16px; }
+  .genre-row { grid-template-columns: 110px 1fr 92px; gap: 8px; }
+  .stat-card.hero .stat-value { font-size: 2rem; }
+  .trend-chart { gap: 6px; height: 180px; }
+}

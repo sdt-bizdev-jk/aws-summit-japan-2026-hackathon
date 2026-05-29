@@ -51,6 +51,19 @@ function getHostAppName(): string {
   return vscode.env.appName;
 }
 
+/**
+ * cycle-6: URL からドメイン (www. 除去後の小文字ホスト名) を抽出する。
+ * 失敗時は null。Chrome 側 LeisureClassifier への分類入力に使う。
+ */
+function extractDomainFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
 const SETTINGS_NAMESPACE = 'aiWaitLessMode';
 const COMMAND_START = 'waitless.startWaiting';
 const COMMAND_END = 'waitless.endWaiting';
@@ -121,6 +134,7 @@ type IpcMessageType =
   | 'TAB_OPENED'
   | 'PAUSE_MEDIA'
   | 'MEDIA_PAUSED'
+  | 'STATS_RECORD'
   | 'PING'
   | 'PONG';
 
@@ -145,6 +159,22 @@ interface TabOpenedPayload {
 
 interface MediaPausedPayload {
   readonly ok: boolean;
+}
+
+/**
+ * cycle-6: IDE 待ちサイクルの統計レコード (Chrome 側 StatsRepository へ送る)。
+ * 余暇種別 (genreId) は Chrome 側で分類するため送らない (F4=A)。
+ * 集中復帰秒数は IDE では計測しない (C4=B)。
+ */
+interface StatsRecordPayload {
+  readonly id: string;
+  readonly source: 'ide';
+  readonly waitStartAt: number;
+  readonly waitEndAt: number;
+  readonly leisureStartAt: number | null;
+  readonly leisureEndAt: number | null;
+  readonly leisureUrl: string | null;
+  readonly leisureDomain: string | null;
 }
 
 type WaitState = 'idle' | 'waiting';
@@ -590,6 +620,11 @@ class WaitOrchestratorIde {
   private state         : WaitState = 'idle';
   private hasOpenedOnce : boolean   = false;  // セッション初回フラグ
 
+  // cycle-6: 進行中サイクルの統計用フィールド
+  private statsWaitStartAt   : number | null = null;
+  private statsLeisureStartAt: number | null = null;
+  private statsLeisureUrl    : string | null = null;
+
   constructor(
     private readonly settings : SettingsReader,
     private readonly ipc      : IpcClient,
@@ -619,11 +654,17 @@ class WaitOrchestratorIde {
       return;
     }
 
+    // cycle-6: 待ち開始時刻を記録 (統計用)
+    this.statsWaitStartAt = Date.now();
+
     // 2 回目以降: URL を開かずに Chrome を前面化するだけ
     if (this.hasOpenedOnce) {
       dlog('startWaiting: subsequent call, only activating Chrome');
       await this.launcher.activateBrowserApp();
       this.state = 'waiting';
+      // 2 回目以降は新規に URL を開かないが、娯楽滞在自体は発生しているとみなす。
+      // 直近に開いた URL を娯楽対象として引き継ぐ。
+      this.statsLeisureStartAt = Date.now();
       return;
     }
 
@@ -649,6 +690,10 @@ class WaitOrchestratorIde {
     dlog('startWaiting: opening', selected.url);
     await this.launcher.open(selected.url);
 
+    // cycle-6: 娯楽切替の開始時刻と URL を記録 (統計用)
+    this.statsLeisureStartAt = Date.now();
+    this.statsLeisureUrl = selected.url;
+
     this.state         = 'waiting';
     this.hasOpenedOnce = true;
   }
@@ -671,6 +716,33 @@ class WaitOrchestratorIde {
     }
 
     await this.activator.activateKiro();
+
+    // cycle-6: 待ちサイクルの統計を Chrome 側へ送信 (S2, A4=A)。best-effort。
+    if (wasWaiting && this.statsWaitStartAt != null) {
+      try {
+        const now = Date.now();
+        const hasLeisure = this.statsLeisureStartAt != null;
+        const record: StatsRecordPayload = {
+          id: `ide-${this.statsWaitStartAt}`,
+          source: 'ide',
+          waitStartAt: this.statsWaitStartAt,
+          waitEndAt: now,
+          leisureStartAt: hasLeisure ? this.statsLeisureStartAt : null,
+          leisureEndAt: hasLeisure ? now : null,
+          leisureUrl: this.statsLeisureUrl,
+          leisureDomain: extractDomainFromUrl(this.statsLeisureUrl),
+        };
+        this.ipc.notify('STATS_RECORD', record);
+        dlog('endWaiting: STATS_RECORD sent', record.id);
+      } catch (e) {
+        dwarn('endWaiting: STATS_RECORD send failed', e);
+      }
+    }
+
+    // 統計用フィールドをリセット
+    this.statsWaitStartAt = null;
+    this.statsLeisureStartAt = null;
+    this.statsLeisureUrl = null;
 
     this.state = 'idle';
   }

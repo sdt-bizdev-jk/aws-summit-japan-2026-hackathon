@@ -1,8 +1,8 @@
 # WaitLess — Backlog
 
-cycle-1 / cycle-2 / cycle-3 / cycle-4 / cycle-5 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
+cycle-1 / cycle-2 / cycle-3 / cycle-4 / cycle-5 / cycle-6 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
 
-最終更新: 2026-05-28 (cycle-5 ポータルページ追加完了時点)
+最終更新: 2026-05-29 (cycle-6 統計ログ + ダッシュボード UI 追加完了時点)
 
 ---
 
@@ -90,10 +90,10 @@ cycle-1 / cycle-2 / cycle-3 / cycle-4 / cycle-5 完了時点で抽出された�
 ---
 
 ### B-09. 統計機能 (待ち時間累計、娯楽時間累計)
-`[Low] [Feature]`
+`[Low] [Feature]` → ✅ 完了 (cycle-6)
 
-- **状態**: 現状は記録しない (アンチスコープ #1)
-- **対処案**: chrome.storage.local に統計用キーを追加し、サイクルごとに累計加算。Options Page で表示
+- **状態**: cycle-6 で実装完了。待ちサイクルごとに統計レコード (`stats_events`) を記録し、ダッシュボード (`extension/dashboard/`) で「今日ダメになった時間 / 余暇種別内訳 / 離脱継続率 / 集中復帰平均秒数 / 未復帰回数 / 待ち時間合計 / 待ちサイクル回数 / 週次トレンド」を表示
+- cycle-9 候補 (継続): エクスポート、任意期間フィルタ、リセット UI 等は B-28〜B-32 参照
 
 ---
 
@@ -196,6 +196,47 @@ cycle-5 で **新規追加** された Backlog 項目:
 - **B-25** [Low] [Tech debt] ポータルページのリンク切れ検知 (カードクリック時の遷移失敗を捕捉、または定期チェック)
 - **B-26** [Low] [Feature] モバイル幅 (< 768px) 対応 (現状は 768〜1280px のみ保証)
 - **B-27** [Low] [Tech debt] ポータルページのデバッグログ OFF (`extension/portal/portal.js` の `const DEBUG = true;`、B-02 / B-12 と同類)
+
+---
+
+## cycle-6 で完了した項目
+
+cycle-6 (2026-05-29 完了) では以下を実装:
+
+### 新規 Unit (論理 3 ユニット)
+- **stats-core** (統計記録の中核)
+  - `extension/sw/stats_repository.js` (≈ 200 行) — `chrome.storage.local.stats_events` の CRUD、上限 5000 件リングバッファ、best-effort 記録、防御的読み込み
+  - `extension/sw/leisure_classifier.js` (≈ 200 行) — 切替先 URL を 12 ジャンル + "other" に段階マッチ分類 (URL完全一致→ホスト名→ドメイン)、純粋関数
+  - 改修: `wait_orchestrator.js` (begin/attach/finalize 記録 + 復帰/再離脱ハンドラ)、`runtime_state.js` (statsPending/statsResumeTargetId)、`message_router.js` (RESUME_ACTION/RE_LEFT)、`claude_site_adapter.js` (復帰操作検知 120s タイムアウト + 再離脱検知 30s 窓)
+- **dashboard-page** (ダッシュボード UI)
+  - `extension/dashboard/{dashboard.html, dashboard.css, dashboard.js, stats_aggregator.js}` — ダーク基調 + 紫アクセント、純粋 HTML/CSS グラフ、storage 直接読み + 純粋関数集計
+  - 改修: `portal/*` + `options/*` (ダッシュボード動線)、`manifest.json` (v0.5.0 → v0.6.0、web_accessible_resources に dashboard/* 4 件)
+- **ide-stats-bridge** (VS Code 連携)
+  - 改修: `ide_bridge.js` (STATS_RECORD 受信 → Chrome 側で分類 → 記録)、`vscode-extension/src/extension.ts` (IDE 待ちサイクル統計の IPC 送信)
+
+### 新規機能 / 指標 (M-01〜M-07)
+- 今日ダメになった時間 (M-02 娯楽滞在合計) / 余暇種別内訳 (M-03 12 ジャンル) / 離脱継続率 (M-04、旧「戻れた率」を再定義) / 集中復帰平均秒数 (M-05) / 未復帰回数 (M-07) / 待ち時間合計 (M-01) / 待ちサイクル回数 (M-06)
+- 週次トレンド (直近 7 日、ダメ時間/待ち時間トグル)
+- Chrome + VS Code (Kiro) の待ちサイクルを合算 (IDE は集中復帰秒数を除く)
+
+### NFR-71 (cycle-1〜5 後方互換性) の実証
+- `extension/sw/{tab_manager, settings_repository}.js` + `extension/service_worker.js` + `extension/reader/*` + `extension/content/playback_*.js` は **完全無変更** (`git status` で実証)
+- 既存への改修はすべて追記中心、`chrome.storage.local` への追加は新規キー `stats_events` のみ (既存スキーマ非干渉)
+
+### 自動検証
+- UT-61 (分類 23/23) + UT-62 (集計 24/24) + UT-63 (構文全 OK) + UT-64 (tsc 成功)
+- 手動 E2E (IT-61〜68) は実機で別途
+
+cycle-6 では以下の Backlog 項目は **対応せず継続**:
+- B-01〜B-08、B-10〜B-13、B-15〜B-27 (B-09 は cycle-6 で完了、B-14 は cycle-4 で完了済)
+
+cycle-6 で **新規追加** された Backlog 項目:
+- **B-28** [Low] [Feature] 統計のリセット / クリア UI (現状は DevTools で `chrome.storage.local.remove('stats_events')`、Q10=B でスコープ外)
+- **B-29** [Low] [Feature] 統計データの CSV / JSON エクスポート
+- **B-30** [Low] [Feature] ダッシュボードの任意期間フィルタ (現状は「今日」+「直近 7 日」のみ)
+- **B-31** [Low] [Feature] VS Code (Kiro) 側の集中復帰秒数の計測 (現状 C4=B で未計測)
+- **B-32** [Low] [Tech debt] 統計関連のデバッグログ OFF (`stats_repository.js` / `dashboard.js` / `leisure_classifier` 由来ログ、B-02/B-12/B-27 と同類)
+- **B-33** [Low] [Tech debt] 余暇種別マッピングの二重管理解消 (`leisure_classifier.js` の GENRE_DEFS と `stats_aggregator.js` の GENRE_LABELS、および `portal_data.js` の重複。単一ソース化を検討)
 
 ---
 

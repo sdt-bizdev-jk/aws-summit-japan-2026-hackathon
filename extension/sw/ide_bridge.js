@@ -15,6 +15,8 @@
 
 import * as SettingsRepository from './settings_repository.js';
 import * as TabManager from './tab_manager.js';
+import * as StatsRepository from './stats_repository.js';
+import * as LeisureClassifier from './leisure_classifier.js';
 
 const DEBUG = true;
 function dlog(...args) {
@@ -364,6 +366,32 @@ async function _handleMessage(msg) {
       } catch (e) {
         dwarn('PAUSE_MEDIA: injectPlaybackPause threw', e);
         _send({ type: 'MEDIA_PAUSED', payload: { ok: false } });
+      }
+      return;
+    }
+
+    case 'STATS_RECORD': {
+      // cycle-6: VS Code (Kiro) からの IDE 待ちサイクル統計を記録する (S2, A4=A, F4=A)。
+      // 余暇種別は Chrome 側 LeisureClassifier で分類 (分類ロジック集約)。応答不要 (notify)。
+      try {
+        const p = payload || {};
+        const leisureUrlOrDomain = p.leisureUrl || p.leisureDomain || '';
+        const hasLeisure = p.leisureStartAt != null;
+        const genreId = hasLeisure && leisureUrlOrDomain
+          ? LeisureClassifier.classify(leisureUrlOrDomain).genreId
+          : null;
+        await StatsRepository.recordCycle({
+          id: p.id,
+          waitStartAt: p.waitStartAt,
+          waitEndAt: p.waitEndAt,
+          leisureStartAt: p.leisureStartAt != null ? p.leisureStartAt : null,
+          leisureEndAt: p.leisureEndAt != null ? p.leisureEndAt : null,
+          leisureDomain: p.leisureDomain != null ? p.leisureDomain : null,
+          leisureGenreId: genreId,
+        });
+        dlog('STATS_RECORD recorded', { genreId });
+      } catch (e) {
+        dwarn('STATS_RECORD: recordCycle threw', e);
       }
       return;
     }

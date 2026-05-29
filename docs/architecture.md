@@ -1,8 +1,8 @@
 # WaitLess — Architecture
 
-このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3 + cycle-4 から VS Code (Kiro) 拡張機能) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-{1,2,3,4,5}/` を参照。
+このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3 + cycle-4 から VS Code (Kiro) 拡張機能) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-{1,2,3,4,5,6}/` を参照。
 
-最終更新: 2026-05-28 (cycle-5 ポータルページ追加完了時点)
+最終更新: 2026-05-29 (cycle-6 統計ログ + ダッシュボード UI 追加完了時点)
 
 ---
 
@@ -15,6 +15,7 @@
 | **cycle-3** | 拡張機能内蔵の Reader Page (`extension/reader/`) を新規追加。クリックで既読範囲を青色化、スクロール+クリック位置を `chrome.storage.local` の `reader_state` キーに永続化、起動時に復元。`DOMAIN_REGEX` と `validateUrl` の protocol 許可を拡張機能 ID / `chrome-extension:` 対応に拡大 (BR-01/02 改訂)。version `0.3.0`。コアロジック (sw/* 5 つのうち 4 つ + content/* + service_worker.js) は非変更 | 新規 `extension/reader/` 4 ファイル + `manifest.json` (`web_accessible_resources` 追加) + `extension/sw/settings_repository.js` + `extension/options/{html,js}` + `extension/README.md` |
 | **cycle-4** | **新規 VS Code (Kiro) 拡張機能 `vscode-extension/`** (TypeScript ~530 行、9 論理コンポーネント) を追加。**ローカル WebSocket IPC** (`ws://127.0.0.1:39472`) で Chrome 拡張と双方向通信し、Kiro Agent Hooks (promptSubmit / agentStop) からの呼び出しで外部ブラウザ起動 + osascript による Kiro 最前面化を実現。既存 Chrome 拡張に **`sw/ide_bridge.js`** を追加 + Options Page に IPC ON/OFF トグルを追加 (version `0.4.0`)。既存 sw/* 4 ファイル + content/* + reader/* は **完全無変更** (NFR-27 厳守)。**2026-05-28 動作確認完了**: Hook ブリッジ方式 (`/tmp/waitless-ide-triggers/` 監視) で Kiro Hook → 拡張機能 → Chrome 連動を実現、`tab_manager.js` にウィンドウフォーカス処理追加 + `BrowserLauncher.activateBrowserApp()` で Chrome アプリ自体の前面化を実装 | 新規 `vscode-extension/` 配下一式 (TypeScript / Hook テンプレート JSON 2 バリアント) + 改修 `extension/{service_worker,manifest,options/*,README}.js` + 新規 `extension/sw/ide_bridge.js` + `extension/sw/tab_manager.js` (Pass 1〜3 全てで `chrome.windows.update({ focused: true })` 追加) |
 | **cycle-5** | **拡張機能内蔵の娯楽ポータルページ (`extension/portal/`)** を新規追加 (4 ファイル ≈ 600 行)。Netflix 風カードグリッドで **12 ジャンル × 6 カード = 72 サイト** へ 1 クリックで遷移。ダーク基調 (#0a0a0f) + 紫アクセント (#7c3aed) の独自テーマ。横スクロール + scroll-snap + ホバー拡大。画像不使用 (絵文字 + CSS グラデのみ、依存ゼロ)。`manifest.json` の `web_accessible_resources` に portal/* 4 件を追加、version `0.4.0` → `0.5.0`。Options Page 空状態案内に「🎬 娯楽ポータル (内蔵)」を 1 行追加 + ワンクリック登録ボタン (`injectPortalExampleUrl`)。**既存 sw/* + content/* + reader/* + service_worker.js + vscode-extension/* は完全無変更** (cycle-3 と同じ NFR-54 方針) | 新規 `extension/portal/{portal.html, portal.css, portal.js, portal_data.js}` + 改修 `extension/manifest.json` + `extension/options/{options.html, options.js, options.css}` + `extension/README.md` |
+| **cycle-6** | **待ちサイクル統計ログ + 内蔵ダッシュボード UI** を追加。新規 `extension/sw/stats_repository.js` (統計レコード CRUD + 上限 5000 件リングバッファ) + `extension/sw/leisure_classifier.js` (切替先 URL を 12 ジャンルに段階マッチ分類) + `extension/dashboard/{dashboard.html, dashboard.css, dashboard.js, stats_aggregator.js}` (ダーク+紫テーマのダッシュボード、純粋 HTML/CSS グラフ、週次トレンド)。`chrome.storage.local` に新規キー `stats_events` を追加 (既存 sites/threshold_sec/reader_state に非干渉)。指標: 今日ダメになった時間 (M-02 娯楽滞在合計) / 余暇種別内訳 (M-03) / 離脱継続率 (M-04、旧「戻れた率」を再定義) / 集中復帰平均秒数 (M-05) / 未復帰回数 (M-07) / 待ち時間合計 (M-01) / 待ちサイクル回数 (M-06)。既存への改修は追記中心: `wait_orchestrator.js` (記録呼び出し)、`runtime_state.js` (statsPending/statsResumeTargetId)、`message_router.js` (RESUME_ACTION/RE_LEFT)、`claude_site_adapter.js` (復帰操作検知 + 再離脱検知)、`ide_bridge.js` (STATS_RECORD 受信)、`vscode-extension/src/extension.ts` (IDE 待ち統計の IPC 送信)、portal/options (ダッシュボード動線)、manifest `0.5.0` → `0.6.0`。**既存 tab_manager.js / settings_repository.js / service_worker.js / reader/* / playback_*.js は完全無変更** (NFR-71、`git status` で実証) | 新規 `extension/sw/{stats_repository,leisure_classifier}.js` + `extension/dashboard/*` 4 ファイル + 改修 `extension/sw/{wait_orchestrator,runtime_state,message_router,ide_bridge}.js` + `extension/content/claude_site_adapter.js` + `extension/portal/{portal.html,portal.js,portal.css}` + `extension/options/{options.html,options.js,options.css}` + `extension/manifest.json` + `vscode-extension/src/extension.ts` |
 
 ---
 
@@ -116,6 +117,9 @@ cycle-1〜3 の Claude.ai → Chrome 拡張のフローは無変更で継続。c
 | OptionsAPI | Options Page | `options/options.js` (後半) | sendMessage の Promise ラッパー |
 | ReaderPage (cycle-3) | Reader Page | `reader/{html,css,js,txt}` | 拡張機能内蔵の読書ページ。組み込み小説の表示、クリックでの既読範囲青色化、`chrome.storage.local` 直接アクセスによる `reader_state` の永続化と復元 |
 | PortalPage (cycle-5) | Portal Page | `portal/{portal.html, portal.css, portal.js, portal_data.js}` | 拡張機能内蔵の娯楽ポータルページ。Netflix 風 12 ジャンル × 6 カード = 72 サイトをカードグリッドで表示、`<a href>` ベースで同タブ遷移。`window.PORTAL_DATA` 静的データから DOM を動的レンダリング |
+| StatsRepository (cycle-6) | SW | `sw/stats_repository.js` | 待ちサイクル統計レコードの CRUD。`chrome.storage.local.stats_events` を所有、上限 5000 件リングバッファ、best-effort 記録 |
+| LeisureClassifier (cycle-6) | SW | `sw/leisure_classifier.js` | 切替先 URL を 12 ジャンル + "other" に段階マッチ分類 (URL→ホスト→ドメイン)。純粋関数 |
+| DashboardPage (cycle-6) | Dashboard Page | `dashboard/{dashboard.html, dashboard.css, dashboard.js, stats_aggregator.js}` | 統計可視化ページ。サマリカード + 余暇種別内訳バー + 週次トレンド棒グラフ (純粋 HTML/CSS)。`chrome.storage.local` を直接読み、StatsAggregator (純粋関数) で集計 |
 
 ---
 
@@ -138,6 +142,9 @@ cycle-1〜3 の Claude.ai → Chrome 拡張のフローは無変更で継続。c
 |------|------|---------|---------|
 | `WAIT_DETECTED` | Content → SW | `{ claudeTabId, durationMs }` | なし |
 | `COMPLETION_DETECTED` | Content → SW | `{ claudeTabId }` | なし |
+| `RESUME_ACTION` (cycle-6) | Content → SW | `{ claudeTabId, at }` または `{ outcome: 'timeout' }` | なし |
+| `RE_LEFT` (cycle-6) | Content → SW | `{ claudeTabId }` | なし |
+| `STATS_RECORD` (cycle-6) | VS Code → Chrome (IPC) | `{ source:'ide', waitStartAt, waitEndAt, leisureStartAt, leisureEndAt, leisureUrl, leisureDomain }` | なし |
 | `GET_SETTINGS` | Options → SW | `{}` | `{ sites, thresholdSec }` |
 | `ADD_SITE` | Options → SW | `{ domain, url }` | `{ ok, reason? }` |
 | `UPDATE_SITE` | Options → SW | `{ originalDomain, domain, url }` | `{ ok, reason? }` |
@@ -190,12 +197,28 @@ reason コード: `invalid_domain` / `invalid_url` / `duplicate_domain` / `not_f
     "scroll_y": 5678,
     "novel_id": "default",
     "updated_at": 1717113600000
-  }
+  },
+  "stats_events": [
+    {
+      "id": "chrome-1717200000000",
+      "source": "chrome",
+      "waitStartAt": 1717200000000,
+      "waitEndAt": 1717200012000,
+      "leisureStartAt": 1717200003000,
+      "leisureEndAt": 1717200012000,
+      "leisureGenreId": "video",
+      "leisureDomain": "youtube.com",
+      "resumeActionAt": 1717200015000,
+      "resumeOutcome": "resumed",
+      "reLeftWithinStay": false,
+      "dateKey": "2026-05-29"
+    }
+  ]
 }
 ```
 
-`SettingsRepository` がストレージ層 (snake_case) ↔ アプリ層 (camelCase) を境界で変換する。
 `reader_state` は cycle-3 で追加された **ReaderPage 専用キー** で、ReaderApp が直接 `chrome.storage.local` を読み書きする (Service Worker を経由しない)。`sites` / `threshold_sec` の既存スキーマには干渉しない (NFR-07 後方互換性)。
+`stats_events` は cycle-6 で追加された **統計専用キー**。StatsRepository (SW) が書き、DashboardPage が直接読む。既存スキーマには干渉しない (NFR-71)。上限 5000 件のリングバッファ。
 
 ### ReaderStateSnapshot (cycle-3)
 
@@ -237,12 +260,20 @@ extension/
 │   ├── wait_orchestrator.js   # WaitOrchestrator
 │   ├── tab_manager.js         # TabManager (現在ウィンドウ + 2パス探索)
 │   ├── settings_repository.js # SettingsRepository (CRUD + バリデーション)
-│   └── runtime_state.js       # RuntimeState (session 永続化)
+│   ├── runtime_state.js       # RuntimeState (session 永続化、cycle-6 で statsPending 追加)
+│   ├── ide_bridge.js          # IdeBridge (cycle-4、cycle-6 で STATS_RECORD 受信)
+│   ├── stats_repository.js    # ★ cycle-6 新規 (統計レコード CRUD + リングバッファ)
+│   └── leisure_classifier.js  # ★ cycle-6 新規 (URL → 12 ジャンル分類)
 ├── content/
-│   ├── claude_site_adapter.js # 静的注入 (claude.ai/*)
+│   ├── claude_site_adapter.js # 静的注入 (claude.ai/*、cycle-6 で復帰/再離脱検知追加)
 │   ├── playback_trigger.js    # 動的注入 (娯楽タブ、再生試行 + リトライ)
 │   └── playback_pause.js      # 動的注入 (娯楽タブ、戻る前に一時停止)
-├── portal/                    # ★ cycle-5 新規 (娯楽ポータルページ)
+├── dashboard/                 # ★ cycle-6 新規 (統計ダッシュボード)
+│   ├── dashboard.html         # サマリ + 内訳 + 週次トレンドの骨格
+│   ├── dashboard.css          # ダーク基調 + 紫アクセント
+│   ├── dashboard.js           # storage 直接読み + 描画 + トグル
+│   └── stats_aggregator.js    # 生レコード → 指標 (M-01〜07) 集計 (純粋関数)
+├── portal/                    # cycle-5 (娯楽ポータルページ、cycle-6 でダッシュボード動線追加)
 │   ├── portal.html            # ヘッダ + main + フッタの骨格
 │   ├── portal.css             # ダーク基調 + 紫アクセント (Netflix 風)
 │   ├── portal.js              # PORTAL_DATA からカード/ジャンル行を生成

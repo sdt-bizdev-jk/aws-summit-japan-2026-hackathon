@@ -115,6 +115,8 @@
       App.injectReaderExampleUrl();
       // cycle-5: 空状態案内に表示する娯楽ポータル (内蔵) の動的 URL を注入 + 登録ボタン
       App.injectPortalExampleUrl();
+      // cycle-6: 統計ダッシュボード (内蔵) への動線を注入
+      App.injectDashboardLink();
       // cycle-4: IPC ON/OFF トグルの初期化
       App.initIpcToggle();
       this.settings = await OptionsAPI.getSettings();
@@ -173,6 +175,23 @@
             }
           });
         }
+      } catch (_e) {
+        // 失敗は黙って許容
+      }
+    },
+
+    /**
+     * cycle-6 (FR-84): 統計ダッシュボード (内蔵) へのリンク href を動的に解決する。
+     * サイト登録の有無に関わらず常時表示。
+     */
+    injectDashboardLink() {
+      try {
+        const link = document.querySelector('[data-testid="dashboard-open-link"]');
+        if (!link) return;
+        const url = chrome.runtime && chrome.runtime.getURL
+          ? chrome.runtime.getURL('dashboard/dashboard.html')
+          : '';
+        if (url) link.href = url;
       } catch (_e) {
         // 失敗は黙って許容
       }
