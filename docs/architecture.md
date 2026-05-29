@@ -2,7 +2,7 @@
 
 このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3 + cycle-4 から VS Code (Kiro) 拡張機能) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-{1,2,3,4,5,6}/` を参照。
 
-最終更新: 2026-05-29 (cycle-8 エンタメ発見ポップアップ追加完了時点)
+最終更新: 2026-05-29 (cycle-9 デスクリサーチ ダイジェスト追加完了時点)
 
 ---
 
@@ -18,6 +18,7 @@
 | **cycle-6** | **待ちサイクル統計ログ + 内蔵ダッシュボード UI** を追加。新規 `extension/sw/stats_repository.js` (統計レコード CRUD + 上限 5000 件リングバッファ) + `extension/sw/leisure_classifier.js` (切替先 URL を 12 ジャンルに段階マッチ分類) + `extension/dashboard/{dashboard.html, dashboard.css, dashboard.js, stats_aggregator.js}` (ダーク+紫テーマのダッシュボード、純粋 HTML/CSS グラフ、週次トレンド)。`chrome.storage.local` に新規キー `stats_events` を追加 (既存 sites/threshold_sec/reader_state に非干渉)。指標: 今日ダメになった時間 (M-02 娯楽滞在合計) / 余暇種別内訳 (M-03) / 離脱継続率 (M-04、旧「戻れた率」を再定義) / 集中復帰平均秒数 (M-05) / 未復帰回数 (M-07) / 待ち時間合計 (M-01) / 待ちサイクル回数 (M-06)。既存への改修は追記中心: `wait_orchestrator.js` (記録呼び出し)、`runtime_state.js` (statsPending/statsResumeTargetId)、`message_router.js` (RESUME_ACTION/RE_LEFT)、`claude_site_adapter.js` (復帰操作検知 + 再離脱検知)、`ide_bridge.js` (STATS_RECORD 受信)、`vscode-extension/src/extension.ts` (IDE 待ち統計の IPC 送信)、portal/options (ダッシュボード動線)、manifest `0.5.0` → `0.6.0`。**既存 tab_manager.js / settings_repository.js / service_worker.js / reader/* / playback_*.js は完全無変更** (NFR-71、`git status` で実証) | 新規 `extension/sw/{stats_repository,leisure_classifier}.js` + `extension/dashboard/*` 4 ファイル + 改修 `extension/sw/{wait_orchestrator,runtime_state,message_router,ide_bridge}.js` + `extension/content/claude_site_adapter.js` + `extension/portal/{portal.html,portal.js,portal.css}` + `extension/options/{options.html,options.js,options.css}` + `extension/manifest.json` + `vscode-extension/src/extension.ts` |
 | **cycle-7** | **待ち時間ブラウジング文脈の取り込み (部分実装)**。生成完了で Claude.ai タブへ戻る際、直前の遷移先タブから URL / タイトル / 見出し / 本文抜粋 / 選択テキスト / リンクを取得 (`captureFromTab`) し、右下パネルで提示 (`offerReflection`)。「AI入力欄に反映」で入力欄へ追記 (既存テキスト保持)。Bedrock 要約はローカルテンプレート整形のデモ実装。AIDLC プロセスなしで実装 (要件: `docs/cycle-7-requirements-leisure-context.md`)。FR-03 (多タブ履歴) / FR-06 (形式選択) / FR-08 (Options ON/OFF) / FR-09 (サイクル間クリア) は未実装 (B-34〜B-37)。version `0.6.0` → `0.7.0` | 新規 `extension/sw/context_repository.js` + 改修 `extension/sw/wait_orchestrator.js` + `extension/manifest.json` |
 | **cycle-8** | **エンタメ発見ポップアップ (広告風・動画再生)**。待ち時間検知時、AI タブ中央にモーダル風ポップアップを表示。映画予告（YouTube 埋め込み、autoplay+mute）を iframe 再生、読書はグラデサムネ＋リンク。レコメンドはハードコード 4 件（映画 3 + 読書 1）＋ランダム選択（セレンディピティ）。**`ads_enabled = true`（デフォルト）の場合、従来のタブ切替フローを完全にスキップ**して AI タブ上でポップアップ表示。Options Page に ON/OFF トグル追加。内蔵プレイヤーページ (`extension/player/`) を追加したが現状未使用。AIDLC プロセスなしで実装。version `0.7.0` → `0.8.0` | 新規 `extension/sw/entertainment_ads.js` + `extension/player/{player.html,player.js}` + 改修 `extension/sw/{wait_orchestrator,tab_manager}.js` + `extension/options/{options.html,options.js}` + `extension/manifest.json` |
+| **cycle-9** | **デスクリサーチ ダイジェスト (Amazon Bedrock 連携)**。待ち時間に閲覧した外部ページを AI タブの会話タイトル + 直近ユーザー発話と紐づけて記録し、**Amazon Bedrock (Claude) で要約**。未設定時はローカル簡易要約にフォールバック。ダッシュボードに「デスクリサーチ ダイジェスト」セクション追加 (タスク別グルーピング、Bedrock/ローカルバッジ)。Options Page に Bedrock 設定 UI (region / modelId / Bearer Token)。`context_repository.js` の抜粋上限 500→3000 文字に拡大。AIDLC プロセスなしで実装。version `0.8.0` → `0.9.0` | 新規 `extension/sw/{bedrock_client,research_repository}.js` + 改修 `extension/sw/{context_repository,wait_orchestrator}.js` + `extension/dashboard/*` 3 ファイル + `extension/options/{options.html,options.js}` + `extension/manifest.json` |
 
 ---
 
@@ -125,6 +126,8 @@ cycle-1〜3 の Claude.ai → Chrome 拡張のフローは無変更で継続。c
 | ContextRepository (cycle-7) | SW | `sw/context_repository.js` | 遷移先タブの文脈取得 (`captureFromTab`)・ローカル要約生成 (`buildBedrockSummary`)・反映パネル注入 (`offerReflection`)。best-effort、失敗時はコア体験を阻害しない |
 | EntertainmentAds (cycle-8) | SW | `sw/entertainment_ads.js` | 広告風エンタメポップアップ。`pickAd()` でランダム選択、`showAdPopup(tabId)` で executeScript によりポップアップ注入。映画 (YouTube iframe autoplay+mute) / 読書をサポート |
 | PlayerPage (cycle-8) | Player Page | `player/{player.html, player.js}` | 内蔵 YouTube プレイヤーページ (?v=<videoId>)。現状は未使用 (showAdPopup が AI タブへ直接 inject する方式のため) |
+| BedrockClient (cycle-9) | SW | `sw/bedrock_client.js` | Amazon Bedrock Runtime 軽量クライアント。Bearer Token / SigV4 両対応。`invoke(prompt)` / `summarizePage(task, ctx)` |
+| ResearchRepository (cycle-9) | SW | `sw/research_repository.js` | デスクリサーチレコードの CRUD。`chrome.storage.local.research_events` を所有、上限 1000 件リングバッファ |
 
 ---
 
@@ -270,7 +273,9 @@ extension/
 │   ├── stats_repository.js    # ★ cycle-6 新規 (統計レコード CRUD + リングバッファ)
 │   ├── leisure_classifier.js  # ★ cycle-6 新規 (URL → 12 ジャンル分類)
 │   ├── context_repository.js  # ★ cycle-7 新規 (遷移先文脈取得 + パネル注入)
-│   └── entertainment_ads.js   # ★ cycle-8 新規 (エンタメ発見ポップアップ)
+│   ├── entertainment_ads.js   # ★ cycle-8 新規 (エンタメ発見ポップアップ)
+│   ├── bedrock_client.js      # ★ cycle-9 新規 (Amazon Bedrock 軽量クライアント)
+│   └── research_repository.js # ★ cycle-9 新規 (デスクリサーチレコード CRUD)
 ├── content/
 │   ├── claude_site_adapter.js # 静的注入 (claude.ai/*、cycle-6 で復帰/再離脱検知追加)
 │   ├── playback_trigger.js    # 動的注入 (娯楽タブ、再生試行 + リトライ)
@@ -425,3 +430,5 @@ manifest.json の主要設定:
     - 要件定義: `docs/cycle-7-requirements-leisure-context.md`
   - cycle-8 (エンタメ発見ポップアップ — AIDLC なし):
     - サイクルサマリ: `aidlc-docs-waitless-archive/cycle-8/cycle-summary.md`
+  - cycle-9 (デスクリサーチ ダイジェスト — AIDLC なし):
+    - サイクルサマリ: `aidlc-docs-waitless-archive/cycle-9/cycle-summary.md`

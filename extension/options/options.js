@@ -121,6 +121,8 @@
       App.initIpcToggle();
       // cycle-7: エンタメ発見ポップアップ ON/OFF トグルの初期化
       App.initAdsToggle();
+      // cycle-7: Amazon Bedrock 要約設定の初期化
+      App.initBedrockSettings();
       this.settings = await OptionsAPI.getSettings();
       this.bindEvents();
       this.render();
@@ -246,6 +248,47 @@
         const next = toggle.checked;
         chrome.storage.local.set({ ads_enabled: next }, () => {
           const _ = chrome.runtime.lastError;
+        });
+      });
+    },
+
+    /**
+     * cycle-7: Amazon Bedrock 要約設定の初期化と保存。
+     * chrome.storage.local.bedrock_config に保存。
+     * 認証方式: Bearer Token (bedrockApiKey) のみ。
+     */
+    initBedrockSettings() {
+      const ids = {
+        region: 'bedrock-region',
+        modelId: 'bedrock-model',
+        bedrockApiKey: 'bedrock-api-key',
+      };
+      const saveBtn = document.getElementById('bedrock-save');
+      const msg = document.getElementById('bedrock-message');
+      if (!saveBtn) return;
+
+      chrome.storage.local.get('bedrock_config', (stored) => {
+        const _ = chrome.runtime.lastError;
+        const c = (stored && stored.bedrock_config) || {};
+        Object.keys(ids).forEach((k) => {
+          const el = document.getElementById(ids[k]);
+          if (el && c[k]) el.value = c[k];
+        });
+      });
+
+      saveBtn.addEventListener('click', () => {
+        const cfg = {};
+        Object.keys(ids).forEach((k) => {
+          const el = document.getElementById(ids[k]);
+          cfg[k] = el ? el.value.trim() : '';
+        });
+        chrome.storage.local.set({ bedrock_config: cfg }, () => {
+          const _ = chrome.runtime.lastError;
+          if (msg) {
+            const ok = cfg.region && cfg.modelId && cfg.bedrockApiKey;
+            msg.textContent = ok ? '保存しました (Bedrock 要約が有効)' : '保存しました (必須項目が未入力のためローカル要約)';
+            msg.className = 'message ' + (ok ? 'success' : 'info');
+          }
         });
       });
     },

@@ -20,6 +20,7 @@
   function warn() { console.warn.apply(console, ['[Dashboard]'].concat([].slice.call(arguments))); }
 
   var STORAGE_KEY = 'stats_events';
+  var RESEARCH_KEY = 'research_events';
   var AGG = window.StatsAggregator;
 
   // 現在のトレンド表示指標 ('leisure' | 'wait')
@@ -40,6 +41,96 @@
         warn('readEvents failed', e);
         resolve([]);
       }
+    });
+  }
+
+  function readResearch() {
+    return new Promise(function (resolve) {
+      try {
+        chrome.storage.local.get(RESEARCH_KEY, function (res) {
+          var arr = (res && Array.isArray(res[RESEARCH_KEY])) ? res[RESEARCH_KEY] : [];
+          resolve(arr);
+        });
+      } catch (e) {
+        warn('readResearch failed', e);
+        resolve([]);
+      }
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // 描画: デスクリサーチ ダイジェスト (cycle-7)
+  // タスク(プロジェクト)ごとにグルーピングして、閲覧ページを一覧表示する。
+  // --------------------------------------------------------------------------
+  function renderResearch(events) {
+    var listEl = document.getElementById('research-list');
+    var emptyEl = document.getElementById('research-empty');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    if (!events || events.length === 0) {
+      if (emptyEl) emptyEl.hidden = false;
+      return;
+    }
+    if (emptyEl) emptyEl.hidden = true;
+
+    // taskTitle でグループ化 (新しい順)
+    var groups = {};
+    var order = [];
+    events.slice().sort(function (a, b) { return (b.capturedAt || 0) - (a.capturedAt || 0); })
+      .forEach(function (e) {
+        var key = e.taskTitle || 'Claude セッション';
+        if (!groups[key]) { groups[key] = []; order.push(key); }
+        groups[key].push(e);
+      });
+
+    order.forEach(function (key) {
+      var items = groups[key];
+      var card = document.createElement('div');
+      card.className = 'research-card';
+      card.setAttribute('data-testid', 'research-card');
+
+      var head = document.createElement('div');
+      head.className = 'research-card-task';
+      head.textContent = '📁 ' + key;
+      // 要約元バッジ (最新エントリの summarizedBy)
+      var by = items[0] && items[0].summarizedBy;
+      var badge = document.createElement('span');
+      badge.className = 'research-badge ' + (by === 'bedrock' ? 'is-bedrock' : 'is-local');
+      badge.textContent = by === 'bedrock' ? 'Amazon Bedrock' : 'ローカル要約';
+      head.appendChild(badge);
+      card.appendChild(head);
+
+      // ダイジェスト (最新エントリの digest を採用)
+      if (items[0] && items[0].digest) {
+        var digest = document.createElement('div');
+        digest.className = 'research-card-digest';
+        digest.textContent = items[0].digest;
+        card.appendChild(digest);
+      }
+
+      var ul = document.createElement('ul');
+      ul.className = 'research-items';
+      items.forEach(function (e) {
+        var li = document.createElement('li');
+        li.className = 'research-item';
+        var t = e.leisureTitle || e.leisureDomain || '(無題)';
+        var dom = e.leisureDomain ? ' — ' + e.leisureDomain : '';
+        if (e.leisureUrl) {
+          var a = document.createElement('a');
+          a.href = e.leisureUrl;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.textContent = t;
+          li.appendChild(a);
+          li.appendChild(document.createTextNode(dom));
+        } else {
+          li.textContent = t + dom;
+        }
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+      listEl.appendChild(card);
     });
   }
 
@@ -274,6 +365,9 @@
       renderSummaryCards(summary);
       renderGenreBreakdown(summary.genreBreakdown);
       renderWeeklyTrend(summary.weeklyTrend, currentMetric);
+      readResearch().then(function (research) {
+        renderResearch(research);
+      });
       log('rendered', { cycles: summary.todayCycleCount });
     });
   }

@@ -297,3 +297,43 @@ body.dashboard {
   .stat-card.hero .stat-value { font-size: 2rem; }
   .trend-chart { gap: 6px; height: 180px; }
 }
+
+/* デスクリサーチ ダイジェスト (cycle-7) */
+.research-section { margin-top: 28px; }
+.research-note { color: var(--muted); font-size: 0.85rem; margin: 4px 0 14px; }
+.research-list { display: flex; flex-direction: column; gap: 12px; }
+.research-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.research-card-task { font-weight: 700; font-size: 1rem; margin-bottom: 8px; }
+.research-card-digest {
+  background: var(--accent-dim);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: var(--text);
+  white-space: pre-wrap;
+  margin-bottom: 10px;
+}
+.research-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.research-item { font-size: 0.85rem; color: var(--muted); }
+.research-item a { color: var(--accent-soft); text-decoration: none; }
+.research-item a:hover { text-decoration: underline; }
+.research-empty { color: var(--muted); font-size: 0.85rem; }
+
+/* 要約元バッジ (cycle-7) */
+.research-badge {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  vertical-align: middle;
+  letter-spacing: 0.03em;
+}
+.research-badge.is-bedrock { background: #1f6f4a; color: #d7ffe9; }
+.research-badge.is-local { background: #3a3a4f; color: #c4c4d6; }

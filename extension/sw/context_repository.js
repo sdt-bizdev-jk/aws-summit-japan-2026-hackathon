@@ -47,7 +47,7 @@ export async function captureFromTab(tabId) {
           .slice(0, 10);
         let excerpt = '';
         const main = document.querySelector('main, article, #content') || document.body;
-        if (main) excerpt = (main.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+        if (main) excerpt = (main.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 3000);
         const selection = (window.getSelection && window.getSelection().toString().trim()) || '';
         return {
           url: location.href,
@@ -70,6 +70,59 @@ export async function captureFromTab(tabId) {
     dlog('captureFromTab failed (ignored)', e);
     return null;
   }
+}
+
+/**
+ * AI タブ (claude.ai) のタスク/プロジェクト文脈を取得する (cycle-7, best-effort)。
+ * 会話タイトル + 直近のユーザー発話の抜粋を返す。
+ * @param {number} claudeTabId
+ * @returns {Promise<{taskTitle:string, taskText:string}|null>}
+ */
+export async function captureTaskContext(claudeTabId) {
+  if (claudeTabId == null) return null;
+  try {
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId: claudeTabId },
+      func: () => {
+        const title = (document.title || '')
+          .replace(/\s*[-–|]\s*Claude.*$/i, '')
+          .trim();
+        let taskText = '';
+        const cands = document.querySelectorAll(
+          '[data-testid="user-message"], .font-user-message, [data-message-author-role="user"]',
+        );
+        if (cands && cands.length) {
+          taskText = (cands[cands.length - 1].innerText || '')
+            .replace(/\s+/g, ' ').trim().slice(0, 200);
+        }
+        return { taskTitle: title || 'Claude セッション', taskText };
+      },
+    });
+    return res && res.result ? res.result : null;
+  } catch (e) {
+    dlog('captureTaskContext failed (ignored)', e);
+    return null;
+  }
+}
+
+/**
+ * デスクリサーチ用ダイジェスト (※デモ用ハードコード)。
+ * タスク文脈を踏まえて、閲覧ページを短く要約する。
+ * @param {{taskTitle?:string}} task
+ * @param {object} ctx LeisureContextSnapshot
+ * @returns {string}
+ */
+export function buildResearchDigest(task, ctx) {
+  const proj = (task && task.taskTitle) || '作業中のタスク';
+  let points = [];
+  if (ctx.headings && ctx.headings.length) points = ctx.headings.slice(0, 3);
+  else if (ctx.title) points = [ctx.title];
+  else if (ctx.links && ctx.links.length) points = ctx.links.slice(0, 3).map((l) => l.text);
+  const bullets = points.map((p) => `・${p}`).join('\n');
+  return [
+    `【ローカル簡易要約】「${proj}」の待ち時間に ${ctx.domain || '外部サイト'} を閲覧。`,
+    bullets,
+  ].filter(Boolean).join('\n');
 }
 
 function extractHost(url) {

@@ -197,6 +197,34 @@
       </p>
     </section>
 
+    <!-- BedrockSection (cycle-7) -->
+    <section class="section" aria-labelledby="bedrock-heading">
+      <h2 id="bedrock-heading">🧠 Amazon Bedrock 要約 (デスクリサーチ)</h2>
+      <p class="hint">
+        待ち時間に閲覧したページの内容を Amazon Bedrock で要約し、
+        ダッシュボードのデスクリサーチ ダイジェストに含めます。
+        未設定の場合はローカルの簡易要約にフォールバックします。
+      </p>
+      <div class="form-row">
+        <label for="bedrock-region">リージョン</label>
+        <input type="text" id="bedrock-region" data-testid="bedrock-region" placeholder="例: us-east-1" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <label for="bedrock-model">モデルID</label>
+        <input type="text" id="bedrock-model" data-testid="bedrock-model" placeholder="例: us.anthropic.claude-haiku-4-5-20251001-v1:0" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <label for="bedrock-api-key">Bearer Token (短期APIキー)</label>
+        <input type="password" id="bedrock-api-key" data-testid="bedrock-api-key" placeholder="bedrock-api-key-XXX" autocomplete="off">
+      </div>
+      <button type="button" id="bedrock-save" data-testid="bedrock-save-button">保存</button>
+      <div class="message" id="bedrock-message" aria-live="polite"></div>
+      <p class="range-note">
+        ⚠ 認証情報はこの端末 (chrome.storage.local) にのみ保存されます。<br>
+        Bearer Token は <code>AWS_BEARER_TOKEN_BEDROCK</code> 環境変数で発行された短期APIキーです。
+      </p>
+    </section>
+
     <!-- IpcToggleSection (cycle-4) -->
     <section class="section" aria-labelledby="ipc-heading">
       <h2 id="ipc-heading">🔌 IDE 連携 (cycle-4 実験的)</h2>

@@ -2,7 +2,7 @@
 
 cycle-1 / cycle-2 / cycle-3 / cycle-4 / cycle-5 / cycle-6 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
 
-最終更新: 2026-05-29 (cycle-8 エンタメ発見ポップアップ追加完了時点)
+最終更新: 2026-05-29 (cycle-9 デスクリサーチ ダイジェスト追加完了時点)
 
 ---
 
@@ -290,6 +290,37 @@ cycle-8 で **新規追加** された Backlog 項目:
 - **B-40** [Medium] [Feature] ads ON 時の AI 生成完了連動でポップアップを自動消去 (現状は completion イベントでポップアップが残り、60 秒タイムアウトまで表示される)
 - **B-41** [Low] [Tech debt] `player/player.html|js` の活用または削除 (manifest に追加済みだが現状未使用)
 - **B-42** [Low] [Tech debt] `entertainment_ads.js` のデバッグログ OFF (`DEBUG = true`、B-02/B-32/B-38 と同類)
+
+---
+
+## cycle-9 で完了した項目
+
+cycle-9 (2026-05-29 完了) では以下を実装 (AIDLC プロセスなし):
+
+### デスクリサーチ ダイジェスト (Amazon Bedrock 連携)
+- **新規** `extension/sw/bedrock_client.js`
+  - `getConfig()` / `isConfigured()`: `bedrock_config` から設定読み込み
+  - `invoke(prompt, maxTokens)`: Bedrock InvokeModel (messages API) 呼び出し。Bearer Token / SigV4 両対応。Web Crypto (crypto.subtle) で SigV4 を自前実装
+  - `summarizePage(task, ctx)`: タスク文脈を踏まえた 3〜4 点箇条書き要約プロンプトを生成して `invoke` する
+- **新規** `extension/sw/research_repository.js`
+  - `appendResearch(event)` / `getAllResearch()`: `chrome.storage.local.research_events` に最大 1000 件リングバッファ
+- **改修** `extension/sw/context_repository.js`
+  - 本文抜粋の上限 500 → 3000 文字に拡大
+  - `captureTaskContext(claudeTabId)`: AI タブの会話タイトル + 直近ユーザー発話 (200 文字) を executeScript で取得
+  - `buildResearchDigest(task, ctx)`: Bedrock フォールバック用のローカル簡易要約
+- **改修** `extension/sw/wait_orchestrator.js`: `onCompletionDetected()` に research 記録ブロックを追記。Bedrock 要約 → ローカルフォールバック → `appendResearch` の順
+- **改修** `extension/dashboard/{dashboard.html, dashboard.js, dashboard.css}`: 「デスクリサーチ ダイジェスト」セクション追加。タスク別グルーピング、Bedrock/ローカルバッジ
+- **改修** `extension/options/{options.html, options.js}`: Bedrock 設定 UI (region / modelId / Bearer Token) + `initBedrockSettings()` 追加
+
+cycle-9 では以下の Backlog 項目は **対応せず継続**:
+- B-01〜B-42 すべて (cycle-9 のスコープから外した)
+
+cycle-9 で **新規追加** された Backlog 項目:
+- **B-43** [Low] [Tech debt] コードコメントの `// cycle-7` 表記誤り (実際は cycle-9 の実装) — `context_repository.js` / `dashboard.*` / `options.*` の `// cycle-7` コメントを `// cycle-9` に修正
+- **B-44** [Low] [Feature] ダッシュボードのタスクグループで最新エントリの digest のみ表示 (各ページの個別ダイジェスト表示が未実装)
+- **B-45** [Low] [Feature] `research_events` のリセット / エクスポート UI なし (B-28/B-29 と同類)
+- **B-46** [Medium] [Feature] SigV4 認証の設定 UI 未実装 (Options Page は Bearer Token のみ。`bedrock_client.js` はコード上 SigV4 対応済み)
+- **B-47** [Low] [Tech debt] `bedrock_client.js` / `research_repository.js` のデバッグログ OFF (`DEBUG = true`、B-02 等と同類)
 
 ---
 

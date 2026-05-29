@@ -14,6 +14,8 @@ import * as StatsRepository from './stats_repository.js';
 import * as LeisureClassifier from './leisure_classifier.js';
 import * as ContextRepository from './context_repository.js';
 import * as EntertainmentAds from './entertainment_ads.js';
+import * as ResearchRepository from './research_repository.js';
+import * as BedrockClient from './bedrock_client.js';
 
 const DEBUG = true;
 function dlog(...args) {
@@ -245,6 +247,48 @@ export async function onCompletionDetected(claudeTabId) {
   if (activatedTabId != null && leisureContext) {
     const summary = ContextRepository.buildBedrockSummary(leisureContext);
     await ContextRepository.offerReflection(activatedTabId, leisureContext, summary);
+
+    // cycle-7: デスクリサーチのダイジェストをダッシュボード用に記録する (best-effort)
+    // AI タブのタスク文脈 (会話タイトル等) と閲覧内容を紐づけて保存する。
+    try {
+      const task = await ContextRepository.captureTaskContext(activatedTabId);
+      const now = Date.now();
+      let genreId = null;
+      try { genreId = LeisureClassifier.classify(leisureContext.url).genreId || null; } catch (_e) {}
+
+      // 訪問ページの内容を Amazon Bedrock で要約 (未設定/失敗時はローカル抽出要約)
+      let digest = null;
+      let summarizedBy = 'local';
+      try {
+        const bedrock = await BedrockClient.summarizePage(task, leisureContext);
+        if (bedrock) {
+          digest = `【Amazon Bedrock 要約】「${(task && task.taskTitle) || '作業中のタスク'}」の文脈で ${leisureContext.domain || '外部サイト'} を要約:\n${bedrock}`;
+          summarizedBy = 'bedrock';
+          dlog('research digest by Bedrock');
+        } else {
+          dlog('research digest fallback to local (Bedrock 未設定 or 失敗)');
+        }
+      } catch (_e) { /* fallback below */ }
+      if (!digest) {
+        digest = ContextRepository.buildResearchDigest(task, leisureContext);
+      }
+
+      await ResearchRepository.appendResearch({
+        id: `res-${now}`,
+        capturedAt: now,
+        dateKey: StatsRepository.toDateKey(now),
+        taskTitle: (task && task.taskTitle) || 'Claude セッション',
+        taskText: (task && task.taskText) || '',
+        leisureTitle: leisureContext.title || '',
+        leisureUrl: leisureContext.url || '',
+        leisureDomain: leisureContext.domain || '',
+        leisureGenreId: genreId,
+        digest,
+        summarizedBy,
+      });
+    } catch (_e) {
+      // best-effort
+    }
   }
 
   // 状態リセット (BR-22)
