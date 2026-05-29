@@ -2,7 +2,7 @@
 
 このドキュメントは WaitLess (Chrome 拡張機能 / Manifest V3 + cycle-4 から VS Code (Kiro) 拡張機能) のアーキテクチャを、メンテナンスを続けるための一次資料として記述する。詳細な設計経緯は `aidlc-docs-waitless-archive/cycle-{1,2,3,4,5,6}/` を参照。
 
-最終更新: 2026-05-29 (cycle-6 統計ログ + ダッシュボード UI 追加完了時点)
+最終更新: 2026-05-29 (cycle-7 待ち時間文脈取り込み 部分実装完了時点)
 
 ---
 
@@ -16,6 +16,7 @@
 | **cycle-4** | **新規 VS Code (Kiro) 拡張機能 `vscode-extension/`** (TypeScript ~530 行、9 論理コンポーネント) を追加。**ローカル WebSocket IPC** (`ws://127.0.0.1:39472`) で Chrome 拡張と双方向通信し、Kiro Agent Hooks (promptSubmit / agentStop) からの呼び出しで外部ブラウザ起動 + osascript による Kiro 最前面化を実現。既存 Chrome 拡張に **`sw/ide_bridge.js`** を追加 + Options Page に IPC ON/OFF トグルを追加 (version `0.4.0`)。既存 sw/* 4 ファイル + content/* + reader/* は **完全無変更** (NFR-27 厳守)。**2026-05-28 動作確認完了**: Hook ブリッジ方式 (`/tmp/waitless-ide-triggers/` 監視) で Kiro Hook → 拡張機能 → Chrome 連動を実現、`tab_manager.js` にウィンドウフォーカス処理追加 + `BrowserLauncher.activateBrowserApp()` で Chrome アプリ自体の前面化を実装 | 新規 `vscode-extension/` 配下一式 (TypeScript / Hook テンプレート JSON 2 バリアント) + 改修 `extension/{service_worker,manifest,options/*,README}.js` + 新規 `extension/sw/ide_bridge.js` + `extension/sw/tab_manager.js` (Pass 1〜3 全てで `chrome.windows.update({ focused: true })` 追加) |
 | **cycle-5** | **拡張機能内蔵の娯楽ポータルページ (`extension/portal/`)** を新規追加 (4 ファイル ≈ 600 行)。Netflix 風カードグリッドで **12 ジャンル × 6 カード = 72 サイト** へ 1 クリックで遷移。ダーク基調 (#0a0a0f) + 紫アクセント (#7c3aed) の独自テーマ。横スクロール + scroll-snap + ホバー拡大。画像不使用 (絵文字 + CSS グラデのみ、依存ゼロ)。`manifest.json` の `web_accessible_resources` に portal/* 4 件を追加、version `0.4.0` → `0.5.0`。Options Page 空状態案内に「🎬 娯楽ポータル (内蔵)」を 1 行追加 + ワンクリック登録ボタン (`injectPortalExampleUrl`)。**既存 sw/* + content/* + reader/* + service_worker.js + vscode-extension/* は完全無変更** (cycle-3 と同じ NFR-54 方針) | 新規 `extension/portal/{portal.html, portal.css, portal.js, portal_data.js}` + 改修 `extension/manifest.json` + `extension/options/{options.html, options.js, options.css}` + `extension/README.md` |
 | **cycle-6** | **待ちサイクル統計ログ + 内蔵ダッシュボード UI** を追加。新規 `extension/sw/stats_repository.js` (統計レコード CRUD + 上限 5000 件リングバッファ) + `extension/sw/leisure_classifier.js` (切替先 URL を 12 ジャンルに段階マッチ分類) + `extension/dashboard/{dashboard.html, dashboard.css, dashboard.js, stats_aggregator.js}` (ダーク+紫テーマのダッシュボード、純粋 HTML/CSS グラフ、週次トレンド)。`chrome.storage.local` に新規キー `stats_events` を追加 (既存 sites/threshold_sec/reader_state に非干渉)。指標: 今日ダメになった時間 (M-02 娯楽滞在合計) / 余暇種別内訳 (M-03) / 離脱継続率 (M-04、旧「戻れた率」を再定義) / 集中復帰平均秒数 (M-05) / 未復帰回数 (M-07) / 待ち時間合計 (M-01) / 待ちサイクル回数 (M-06)。既存への改修は追記中心: `wait_orchestrator.js` (記録呼び出し)、`runtime_state.js` (statsPending/statsResumeTargetId)、`message_router.js` (RESUME_ACTION/RE_LEFT)、`claude_site_adapter.js` (復帰操作検知 + 再離脱検知)、`ide_bridge.js` (STATS_RECORD 受信)、`vscode-extension/src/extension.ts` (IDE 待ち統計の IPC 送信)、portal/options (ダッシュボード動線)、manifest `0.5.0` → `0.6.0`。**既存 tab_manager.js / settings_repository.js / service_worker.js / reader/* / playback_*.js は完全無変更** (NFR-71、`git status` で実証) | 新規 `extension/sw/{stats_repository,leisure_classifier}.js` + `extension/dashboard/*` 4 ファイル + 改修 `extension/sw/{wait_orchestrator,runtime_state,message_router,ide_bridge}.js` + `extension/content/claude_site_adapter.js` + `extension/portal/{portal.html,portal.js,portal.css}` + `extension/options/{options.html,options.js,options.css}` + `extension/manifest.json` + `vscode-extension/src/extension.ts` |
+| **cycle-7** | **待ち時間ブラウジング文脈の取り込み (部分実装)**。生成完了で Claude.ai タブへ戻る際、直前の遷移先タブから URL / タイトル / 見出し / 本文抜粋 / 選択テキスト / リンクを取得 (`captureFromTab`) し、右下パネルで提示 (`offerReflection`)。「AI入力欄に反映」で入力欄へ追記 (既存テキスト保持)。Bedrock 要約はローカルテンプレート整形のデモ実装。AIDLC プロセスなしで実装 (要件: `docs/cycle-7-requirements-leisure-context.md`)。FR-03 (多タブ履歴) / FR-06 (形式選択) / FR-08 (Options ON/OFF) / FR-09 (サイクル間クリア) は未実装 (B-34〜B-37)。version `0.6.0` → `0.7.0` | 新規 `extension/sw/context_repository.js` + 改修 `extension/sw/wait_orchestrator.js` + `extension/manifest.json` |
 
 ---
 
@@ -120,6 +121,7 @@ cycle-1〜3 の Claude.ai → Chrome 拡張のフローは無変更で継続。c
 | StatsRepository (cycle-6) | SW | `sw/stats_repository.js` | 待ちサイクル統計レコードの CRUD。`chrome.storage.local.stats_events` を所有、上限 5000 件リングバッファ、best-effort 記録 |
 | LeisureClassifier (cycle-6) | SW | `sw/leisure_classifier.js` | 切替先 URL を 12 ジャンル + "other" に段階マッチ分類 (URL→ホスト→ドメイン)。純粋関数 |
 | DashboardPage (cycle-6) | Dashboard Page | `dashboard/{dashboard.html, dashboard.css, dashboard.js, stats_aggregator.js}` | 統計可視化ページ。サマリカード + 余暇種別内訳バー + 週次トレンド棒グラフ (純粋 HTML/CSS)。`chrome.storage.local` を直接読み、StatsAggregator (純粋関数) で集計 |
+| ContextRepository (cycle-7) | SW | `sw/context_repository.js` | 遷移先タブの文脈取得 (`captureFromTab`)・ローカル要約生成 (`buildBedrockSummary`)・反映パネル注入 (`offerReflection`)。best-effort、失敗時はコア体験を阻害しない |
 
 ---
 
@@ -263,7 +265,8 @@ extension/
 │   ├── runtime_state.js       # RuntimeState (session 永続化、cycle-6 で statsPending 追加)
 │   ├── ide_bridge.js          # IdeBridge (cycle-4、cycle-6 で STATS_RECORD 受信)
 │   ├── stats_repository.js    # ★ cycle-6 新規 (統計レコード CRUD + リングバッファ)
-│   └── leisure_classifier.js  # ★ cycle-6 新規 (URL → 12 ジャンル分類)
+│   ├── leisure_classifier.js  # ★ cycle-6 新規 (URL → 12 ジャンル分類)
+│   └── context_repository.js  # ★ cycle-7 新規 (遷移先文脈取得 + パネル注入)
 ├── content/
 │   ├── claude_site_adapter.js # 静的注入 (claude.ai/*、cycle-6 で復帰/再離脱検知追加)
 │   ├── playback_trigger.js    # 動的注入 (娯楽タブ、再生試行 + リトライ)
@@ -413,3 +416,6 @@ manifest.json の主要設定:
     - Functional Design (Unit 2): `aidlc-docs-waitless-archive/cycle-4/construction/chrome-extension-bridge/functional-design/`
     - Build & Test サマリ: `aidlc-docs-waitless-archive/cycle-4/construction/build-and-test/build-and-test-summary.md`
     - 監査ログ: `aidlc-docs-waitless-archive/cycle-4/audit.md`
+  - cycle-7 (待ち時間文脈取り込み — AIDLC なし部分実装):
+    - サイクルサマリ: `aidlc-docs-waitless-archive/cycle-7/cycle-summary.md`
+    - 要件定義: `docs/cycle-7-requirements-leisure-context.md`

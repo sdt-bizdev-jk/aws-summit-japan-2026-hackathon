@@ -12,6 +12,7 @@ import * as SettingsRepository from './settings_repository.js';
 import * as RuntimeState from './runtime_state.js';
 import * as StatsRepository from './stats_repository.js';
 import * as LeisureClassifier from './leisure_classifier.js';
+import * as ContextRepository from './context_repository.js';
 
 const DEBUG = true;
 function dlog(...args) {
@@ -188,7 +189,11 @@ export async function onCompletionDetected(claudeTabId) {
 
   // 娯楽タブの動画を一時停止 (戻る前に)
   const playTabId = RuntimeState.getPlayTabId();
+
+  // cycle-7: 一時停止の前に、遷移先タブの閲覧文脈を取得する (FR-01, best-effort)
+  let leisureContext = null;
   if (playTabId != null) {
+    leisureContext = await ContextRepository.captureFromTab(playTabId);
     await TabManager.injectPlaybackPause(playTabId);
   }
 
@@ -196,21 +201,30 @@ export async function onCompletionDetected(claudeTabId) {
   const targetCandidate = recordedId != null ? recordedId : claudeTabId;
 
   let activated = false;
+  let activatedTabId = null;
 
   if (targetCandidate != null && (await TabManager.tabExists(targetCandidate))) {
     await TabManager.activateTab(targetCandidate);
     activated = true;
+    activatedTabId = targetCandidate;
   } else {
     // フォールバック: Claude.ai タブを再探索 (BR-14)
     const fallback = await TabManager.findClaudeTab();
     if (fallback != null) {
       await TabManager.activateTab(fallback);
       activated = true;
+      activatedTabId = fallback;
     }
   }
 
   if (!activated) {
     console.info('[WaitLess] no Claude.ai tab to activate; staying as is');
+  }
+
+  // cycle-7: AI タブへ戻った後、取り込みパネルを提示する (FR-04/05, best-effort)
+  if (activatedTabId != null && leisureContext) {
+    const summary = ContextRepository.buildBedrockSummary(leisureContext);
+    await ContextRepository.offerReflection(activatedTabId, leisureContext, summary);
   }
 
   // 状態リセット (BR-22)

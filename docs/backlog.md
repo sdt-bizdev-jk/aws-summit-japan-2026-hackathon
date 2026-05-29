@@ -2,7 +2,7 @@
 
 cycle-1 / cycle-2 / cycle-3 / cycle-4 / cycle-5 / cycle-6 完了時点で抽出された「次にやるかもしれない」項目の一覧。次サイクルの Inception でスコープ選定の出発点として使う。
 
-最終更新: 2026-05-29 (cycle-6 統計ログ + ダッシュボード UI 追加完了時点)
+最終更新: 2026-05-29 (cycle-7 待ち時間文脈取り込み 部分実装完了時点)
 
 ---
 
@@ -237,6 +237,30 @@ cycle-6 で **新規追加** された Backlog 項目:
 - **B-31** [Low] [Feature] VS Code (Kiro) 側の集中復帰秒数の計測 (現状 C4=B で未計測)
 - **B-32** [Low] [Tech debt] 統計関連のデバッグログ OFF (`stats_repository.js` / `dashboard.js` / `leisure_classifier` 由来ログ、B-02/B-12/B-27 と同類)
 - **B-33** [Low] [Tech debt] 余暇種別マッピングの二重管理解消 (`leisure_classifier.js` の GENRE_DEFS と `stats_aggregator.js` の GENRE_LABELS、および `portal_data.js` の重複。単一ソース化を検討)
+
+---
+
+## cycle-7 で完了した項目
+
+cycle-7 (2026-05-29 完了) では以下を実装 (AIDLC プロセスなし、部分実装):
+
+### Leisure Context Capture — 部分実装
+- **新規** `extension/sw/context_repository.js`
+  - `captureFromTab(tabId)`: 遷移先タブから URL / タイトル / 見出し / 本文抜粋 / 選択テキスト / リンク取得
+  - `buildBedrockSummary(ctx)`: ローカルテンプレート整形によるデモ要約 (実際の Bedrock 呼び出しなし)
+  - `offerReflection(claudeTabId, ctx, summary)`: Claude.ai タブへ取り込みパネルを注入 (右下固定、30 秒で自動消去)
+- **改修** `extension/sw/wait_orchestrator.js`: 生成完了 → パネル提示の呼び出し追記 (3 箇所、best-effort)
+- **改修** `extension/manifest.json`: version `0.6.0` → `0.7.0`
+
+cycle-7 では以下の Backlog 項目は **対応せず継続**:
+- B-01〜B-33 すべて (cycle-7 のスコープから外した)
+
+cycle-7 で **新規追加** された Backlog 項目:
+- **B-34** [Medium] [Feature] 文脈取り込みの多タブ履歴蓄積 (FR-03: 現状は最後の 1 タブのみ。`chrome.storage.session` に `leisure_context` キーで時系列蓄積する設計は要件に定義済)
+- **B-35** [Medium] [Feature] 反映形式の選択 UI (FR-06: 原文抜粋 / リンク一覧 / Bedrock 要約を選べる形に。現状はハードコード要約のみ)
+- **B-36** [Medium] [Feature] Options Page への文脈取り込み ON/OFF トグル + 設定 UI (FR-08: 取得文字数上限、既定反映形式の設定)
+- **B-37** [Low] [Feature] 次の待ちサイクル開始時に前回の文脈履歴をクリア (FR-09)
+- **B-38** [Low] [Tech debt] `context_repository.js` のデバッグログ OFF (`DEBUG = true`、B-02/B-32 と同類)
 
 ---
 
