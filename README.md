@@ -77,6 +77,10 @@ WaitLess は **2 つの拡張機能** で構成され、ローカル WebSocket �
 +------------------------------------------------------------------+
 ```
 
+より詳細な全体図（Chrome 拡張 + VS Code (Kiro) 拡張、cycle-9 時点）は次のとおり。
+
+![WaitLess アーキテクチャ全体図（cycle-9 時点）](./assets/architecture-waitless.png)
+
 詳細は [`docs/architecture.md`](./docs/architecture.md) を参照。
 
 ### 技術スタック
